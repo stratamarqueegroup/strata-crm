@@ -228,6 +228,11 @@ td textarea{width:100%;min-width:190px;min-height:64px;font-size:13.5px;padding:
 .kpi b{display:block;font-size:30px;font-weight:600;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
 .kpi span{font-size:13px;color:var(--muted)}
 .num{font-variant-numeric:tabular-nums;text-align:right}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:40;background:var(--ink);color:var(--bg);padding:12px 14px 12px 18px;border-radius:14px;display:flex;gap:16px;align-items:center;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);transition:opacity .2s,transform .2s;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.toast button{background:none;color:var(--blue);font-weight:600;padding:4px 6px;font-size:14px}
+:root[data-theme="dark"] .toast button{color:#2997ff}
+.calling{margin:0 0 10px;padding:12px 14px;border-radius:12px;background:var(--blue-soft);color:var(--ink);font-size:14px}
 th.num{text-align:right}
 /* ---------- sign-in gate ---------- */
 .gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
@@ -328,7 +333,8 @@ th.num{text-align:right}
       <select id="pCamp" style="width:auto;min-width:170px"><option value="">All campaigns</option></select>
       <div class="seg" id="ownerSeg"><button id="oAll" class="on">Everyone</button><button id="oMine">Mine</button><button id="oNone">Unassigned</button></div>
       <label class="check" for="callVia" style="gap:6px">Calls open in
-        <select id="callVia" style="width:auto;min-width:150px;height:34px;padding:6px 28px 6px 10px;font-size:13.5px;background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px"><option value="tel">Phone app</option><option value="gv">Google Voice</option></select>
+        <select id="callVia" style="width:auto;min-width:150px;height:34px;padding:6px 28px 6px 10px;font-size:13.5px;background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px"><option value="tel">One-click (Google Voice on computer, phone app on mobile)</option><option value="gv">Open the Google Voice website</option></select>
+        <button class="linkbtn" id="gvHelp" type="button">How to set up</button>
       </label>
       <span class="grow"></span>
       <span id="bulkWrap" class="hidden" style="display:inline-flex;gap:6px;align-items:center">
@@ -359,6 +365,11 @@ th.num{text-align:right}
         <thead><tr><th>Rep</th><th class="num">Calls</th><th class="num">Conversations</th><th class="num">Demos booked</th><th class="num">Book rate</th><th class="num">Open leads</th><th class="num">Due</th><th class="num">Overdue</th><th class="num">Won</th></tr></thead>
         <tbody id="dRows"></tbody>
       </table>
+    </div>
+    <div id="trashBox" class="hidden">
+      <h2 style="font-size:22px;letter-spacing:-.02em;margin:40px 2px 6px">Recently removed</h2>
+      <p class="note" style="margin:0 2px 14px">Leads removed by mistake can be restored with their stage, notes, follow-up and owner.</p>
+      <div class="tablewrap"><table style="min-width:520px"><thead><tr><th>Business</th><th>Removed by</th><th>When</th><th></th></tr></thead><tbody id="trashRows"></tbody></table></div>
     </div>
     <div id="adminBox" class="hidden">
       <h2 style="font-size:22px;letter-spacing:-.02em;margin:40px 2px 6px">Access requests</h2>
@@ -427,18 +438,18 @@ th.num{text-align:right}
 
 
   const STAGES = [
-    ["new","New"],["contacted","Contacted"],["replied","Replied"],["demo","Demo booked"],
+    ["none","None"],["new","New"],["contacted","Contacted"],["replied","Replied"],["demo","Demo booked"],
     ["won","Won"],["lost","Lost"],["dnc","Do not contact"]
   ];
   const STAGE_NAME = Object.fromEntries(STAGES);
   const CLOSED = ["won","lost","dnc"];
   // what call_leads.py reads in outreach_status
-  const CALL_STATUS = { new:"new", contacted:"called", replied:"new", demo:"booked", won:"booked", lost:"not_interested", dnc:"do_not_call" };
+  const CALL_STATUS = { none:"new", new:"new", contacted:"called", replied:"new", demo:"booked", won:"booked", lost:"not_interested", dnc:"do_not_call" };
   // one-click dispositions: [key, label, tone, stage rule, follow-up days (null = clear, "pick" = use the date field)]
   const DISPO = [
-    ["no_answer","No answer","",       s => s === "new" ? "contacted" : s, 1],
-    ["voicemail","Left voicemail","",  s => s === "new" ? "contacted" : s, 2],
-    ["callback","Call back","",        s => ["new","contacted"].includes(s) ? "replied" : s, "pick"],
+    ["no_answer","No answer","",       s => ["new","none"].includes(s) ? "contacted" : s, 1],
+    ["voicemail","Left voicemail","",  s => ["new","none"].includes(s) ? "contacted" : s, 2],
+    ["callback","Call back","",        s => ["new","none","contacted"].includes(s) ? "replied" : s, "pick"],
     ["interested","Interested","good", () => "replied", 2],
     ["demo","Demo booked","good",      () => "demo", null],
     ["not_interested","Not interested","bad", () => "lost", null],
@@ -502,6 +513,14 @@ th.num{text-align:right}
   function msg(el, text, err){ el.innerHTML = ""; if (!text) return; const d = document.createElement("div"); d.className = "msg" + (err ? " err" : ""); d.textContent = text; el.appendChild(d); }
   const status = (t, e) => msg($("status"), t, e);
   const pStatus = (t, e) => msg($("pStatus"), t, e);
+  // small "Undo" bar at the bottom of the screen
+  let toastTimer = null;
+  function toast(text, action, fn){
+    let t = $("toast"); if (!t){ t = document.createElement("div"); t.id = "toast"; t.className = "toast"; document.body.appendChild(t); }
+    t.innerHTML = ""; const sp = document.createElement("span"); sp.textContent = text; t.appendChild(sp);
+    if (action){ const b = document.createElement("button"); b.textContent = action; b.onclick = async () => { t.classList.remove("show"); await fn(); }; t.appendChild(b); }
+    t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 10000);
+  }
   let renderTimer = null;
   function scheduleRender(){ clearTimeout(renderTimer); renderTimer = setTimeout(renderAll, 30); }
 
@@ -597,20 +616,40 @@ th.num{text-align:right}
     await loadLocal(); kick();
   }
   async function deleteLead(id){
+    const row = L.get(id); const keep = row ? { body: strip(row), base: row._base || null, assignTo: ownerOf(id) } : null;
     await ldb.transaction("rw", ldb.leads, ldb.outbox, async () => {
       await ldb.leads.delete(id);
       const q = await ldb.outbox.where("docId").equals(id).toArray();
       const created = q.some(o => o.kind === "lead.create");
       for (const o of q) if (o.seq !== inflight) await ldb.outbox.delete(o.seq);
-      if (!created) await ldb.outbox.add({ kind: "lead.delete", docId: id, createdAt: nowIso() });
+      if (!created) await ldb.outbox.add({ kind: "lead.delete", docId: id, assignTo: keep?.assignTo || "", createdAt: nowIso() });
     });
+    await loadLocal(); kick();
+    if (keep) toast(`Removed ${keep.body.name}`, "Undo", () => restoreLead(id, keep.body, keep.assignTo));
+  }
+  // bring a removed lead back with everything it had: stage, notes, follow-up, owner
+  async function restoreLead(id, body, assignTo){
+    if (L.has(id)) return;
+    const q = await ldb.outbox.where("docId").equals(id).toArray();
+    const pendingDel = q.find(o => o.kind === "lead.delete" && o.seq !== inflight);
+    if (pendingDel){
+      // the removal hasn't reached the server yet: just cancel it
+      await ldb.transaction("rw", ldb.leads, ldb.outbox, async () => { await ldb.outbox.delete(pendingDel.seq); await ldb.leads.put({ ...body, id, _base: body }); });
+      await loadLocal(); kick(); return;
+    }
+    const clean = { ...body }; delete clean.rev;
+    await createLead(id, clean);
+    if (assignTo && isAdmin) await assignLead(id, assignTo);
+    await ldb.outbox.add({ kind: "trash.delete", docId: id, createdAt: nowIso() });
     await loadLocal(); kick();
   }
   async function logCall(leadId, disposition, note, followPick){
     const lead = L.get(leadId); if (!lead) return;
     const id = "c_" + uuid();
     const at = nowIso();
-    const call = { leadId, by: myId || null, at, disposition, note: (note || "").slice(0, 4000), leadName: lead.name || "" };
+    // remember what this call changed, so it can be undone exactly
+    const prev = { stage: lead.stage || "new", followUp: lead.followUp || "", lastDisposition: lead.lastDisposition || "", lastCallAt: lead.lastCallAt || "", lastCallBy: lead.lastCallBy || "" };
+    const call = { leadId, by: myId || null, at, disposition, note: (note || "").slice(0, 4000), leadName: lead.name || "", ...(disposition !== "note" ? { prev } : {}) };
     await ldb.transaction("rw", ldb.calls, ldb.outbox, async () => {
       await ldb.calls.put({ ...call, id, _synced: false });
       await ldb.outbox.add({ kind: "call.create", docId: id, body: call, createdAt: at });
@@ -621,6 +660,21 @@ th.num{text-align:right}
       fields.followUp = d[4] === null ? "" : d[4] === "pick" ? (followPick || plusDays(1)) : plusDays(d[4]);
       await patchLead(leadId, fields);
     } else { await loadLocal(); kick(); }
+    return id;
+  }
+  // take back a call logged by mistake: remove it, and if it's the lead's latest call, put the lead back how it was
+  async function undoCall(callId){
+    const c = C.get(callId); if (!c) return;
+    const lead = L.get(c.leadId);
+    await ldb.transaction("rw", ldb.calls, ldb.outbox, async () => {
+      await ldb.calls.delete(callId);
+      const q = await ldb.outbox.where("docId").equals(callId).toArray();
+      const pendingCreate = q.find(o => o.kind === "call.create" && o.seq !== inflight);
+      if (pendingCreate) await ldb.outbox.delete(pendingCreate.seq);          // never reached the server: just forget it
+      else await ldb.outbox.add({ kind: "call.delete", docId: callId, createdAt: nowIso() });
+    });
+    if (lead && c.prev && lead.lastCallAt === c.at) await patchLead(c.leadId, { ...c.prev });
+    else { await loadLocal(); kick(); }
   }
   // assign many leads in one go (one local transaction, then one sync pass)
   async function assignMany(pairs){
@@ -688,7 +742,7 @@ th.num{text-align:right}
   }
 
   async function pushOp(op){
-    const coll = op.kind.startsWith("lead") ? "leads" : op.kind.startsWith("call") ? "calls" : "assign";
+    const coll = op.kind.startsWith("lead") ? "leads" : op.kind.startsWith("call") ? "calls" : op.kind.startsWith("trash") ? "trash" : "assign";
     const ref = rdb.collection(coll).doc(op.docId);
 
     if (op.kind === "call.create" || op.kind === "assign.set"){
@@ -698,7 +752,19 @@ th.num{text-align:right}
       await rejected(op, w.e); return "drop";
     }
 
+    if (op.kind === "call.delete" || op.kind === "trash.delete"){
+      const w = await guard(() => rdb.collection(op.kind === "call.delete" ? "calls" : "trash").doc(op.docId).delete());
+      if (w.ok) return "done"; if (w.retry) return "retry"; await rejected(op, w.e); return "drop";
+    }
+
     if (op.kind === "lead.delete"){
+      // keep a copy in "Recently removed" first, so a removal can always be undone
+      const g0 = await guard(() => ref.get());
+      if (!g0.ok){ if (g0.retry) return "retry"; await rejected(op, g0.e); return "drop"; }
+      if (g0.r.exists){
+        const t = await guard(() => rdb.collection("trash").doc(op.docId).set({ lead: g0.r.data(), assignTo: op.assignTo || "", deletedBy: myId || null, deletedAt: op.createdAt }));
+        if (!t.ok){ if (t.retry) return "retry"; await rejected(op, t.e); return "drop"; }
+      }
       const w = await guard(() => ref.delete());
       if (w.ok) return "done"; if (w.retry) return "retry"; await rejected(op, w.e); return "drop";
     }
@@ -829,10 +895,13 @@ th.num{text-align:right}
 
     rdb.collection("calls").onSnapshot(async snap => {
       if (!snap.metadata.fromCache) remoteReady.calls = true;
-      // the call log only grows: store just the calls this device doesn't have yet
+      // store calls this device doesn't have yet; drop calls someone undid
       const fresh = snap.docs.filter(d => d.exists && !C.get(d.id)?._synced).map(d => ({ ...d.data(), id: d.id, _synced: true }));
-      if (!fresh.length) return;
-      await ldb.calls.bulkPut(fresh);
+      let gone = [];
+      if (!snap.metadata.fromCache){ const ids = new Set(snap.docs.map(d => d.id)); gone = [...C.values()].filter(c => c._synced && !ids.has(c.id)).map(c => c.id); }
+      if (!fresh.length && !gone.length) return;
+      if (fresh.length) await ldb.calls.bulkPut(fresh);
+      if (gone.length) await ldb.calls.bulkDelete(gone);
       loadSoon();
     }, () => {});
 
@@ -865,6 +934,10 @@ th.num{text-align:right}
     }, () => {});
   }
 
+  function subscribeTrash(){
+    if (!rdb || !isAdmin) return;
+    rdb.collection("trash").onSnapshot(snap => { TR = new Map(snap.docs.filter(d => d.exists).map(d => [d.id, d.data()])); if (view === "dash") renderTrash(); }, () => {});
+  }
   async function registerMember(){
     if (!rdb || !myId) return;
     try {
@@ -928,7 +1001,7 @@ th.num{text-align:right}
     }
     if (myId) await ldb.meta.put({ k: "me", v: myId }); else { const m = await ldb.meta.get("me"); myId = m?.v || null; }
     updatePill(); scheduleRender();
-    if (rdb){ subscribe(); registerMember(); flush(); }
+    if (rdb){ subscribe(); subscribeTrash(); registerMember(); flush(); }
   })();
 
   async function resolveNames(){
@@ -1152,14 +1225,19 @@ th.num{text-align:right}
   // where a tapped number goes: the device's phone app (tel:) or the rep's Google Voice account in a new tab
   let callVia = (() => { try { return localStorage.getItem("sm-callvia") || "tel"; } catch { return "tel"; } })();
   function gvUrl(num){ return "https://voice.google.com/u/0/calls?a=nc," + encodeURIComponent(num); }
-  function phoneLink(phone, e){
+  let callingId = null;   // lead being called right now: its card opens, ready for the outcome
+  function phoneLink(phone, e, leadIdForCall){
     if (!phone){ return document.createTextNode("—"); }
     const num = e || e164(phone) || String(phone).replace(/[^\d+]/g, "");
     const a = document.createElement("a"); a.textContent = phone;
+    const afterClick = () => { if (leadIdForCall && L.has(leadIdForCall)){ callingId = leadIdForCall; setTimeout(() => openSheet(leadIdForCall), 60); } };
     if (callVia === "gv"){
       a.href = gvUrl(num); a.target = "_blank"; a.rel = "noopener"; a.title = "Call with Google Voice (number copied)";
-      a.onclick = ev => { ev.stopPropagation(); try { navigator.clipboard?.writeText(num).catch(() => {}); } catch {} };
-    } else { a.href = "tel:" + num; a.onclick = ev => ev.stopPropagation(); }
+      a.onclick = ev => { ev.stopPropagation(); try { navigator.clipboard?.writeText(num).catch(() => {}); } catch {} afterClick(); };
+    } else {
+      // with Google Voice one-click dialing turned on, Chrome opens Voice and dials this number
+      a.href = "tel:" + num; a.title = "Call"; a.onclick = ev => { ev.stopPropagation(); afterClick(); };
+    }
     return a;
   }
 
@@ -1229,7 +1307,7 @@ th.num{text-align:right}
       tr.onclick = ev => { if (ev.target.closest("select,input,button,a,textarea")) return; openSheet(d.id); };
       const c1 = document.createElement("td");
       c1.append(bizCell(d.name, d.maps, [d.category, d.city, d.campaign]));
-      const ph = document.createElement("div"); ph.className = "mono"; ph.style.marginTop = "4px"; ph.appendChild(phoneLink(d.phone, d.phone_e164));
+      const ph = document.createElement("div"); ph.className = "mono"; ph.style.marginTop = "4px"; ph.appendChild(phoneLink(d.phone, d.phone_e164, d.id));
       if (pend.has(d.id)){ const pd = document.createElement("span"); pd.className = "pend-dot"; pd.title = "Waiting to sync"; ph.appendChild(pd); }
       c1.appendChild(ph);
       const c2 = document.createElement("td");
@@ -1314,7 +1392,7 @@ th.num{text-align:right}
     const h = document.createElement("h2"); h.textContent = d.name; sh.appendChild(h);
     const sub = document.createElement("div"); sub.className = "cat"; sub.textContent = [d.category, d.city, d.campaign].filter(Boolean).join(" · "); sh.appendChild(sub);
     const kv = document.createElement("div"); kv.className = "kv";
-    kv.appendChild(phoneLink(d.phone, d.phone_e164));
+    kv.appendChild(phoneLink(d.phone, d.phone_e164, d.id));
     if (d.maps){ const a = document.createElement("a"); a.href = d.maps; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Google Maps"; kv.appendChild(a); }
     if (d.website){ const a = document.createElement("a"); a.href = d.website; a.target = "_blank"; a.rel = "noopener"; a.textContent = host(d.website); kv.appendChild(a); }
     const [tl, tc] = TAGS[d.tier] || []; if (tl){ const t = document.createElement("span"); t.className = "tag " + tc; t.textContent = (d.offer === "web" ? "Website · " : "") + tl; kv.appendChild(t); }
@@ -1330,6 +1408,7 @@ th.num{text-align:right}
 
     // log a call
     const h3a = document.createElement("h3"); h3a.textContent = "Log a call"; sh.appendChild(h3a);
+    if (callingId === d.id){ const cb = document.createElement("div"); cb.className = "calling"; cb.textContent = `Calling ${d.phone}… When you hang up, add a note if you like and tap how it went. It’s saved under your name.`; sh.appendChild(cb); }
     const note = document.createElement("textarea"); note.id = "callNote"; note.placeholder = "What was said (optional)"; note.value = sheetDraftNote; note.disabled = readOnly;
     note.oninput = () => { sheetDraftNote = note.value; };
     sh.appendChild(note);
@@ -1338,8 +1417,9 @@ th.num{text-align:right}
       const b = document.createElement("button"); b.textContent = label; if (tone) b.classList.add(tone); b.disabled = readOnly;
       b.onclick = async () => {
         if (k === "dnc" && !confirm(`Mark ${d.name} as do not call?`)) return;
-        const n = note.value.trim(); sheetDraftNote = "";
-        await logCall(d.id, k, n, $("fuDate")?.value || "");
+        const n = note.value.trim(); sheetDraftNote = ""; callingId = null;
+        const cid = await logCall(d.id, k, n, $("fuDate")?.value || "");
+        if (cid) toast(`Logged “${label}” for ${d.name}`, "Undo", () => undoCall(cid));
       };
       grid.appendChild(b);
     });
@@ -1411,6 +1491,12 @@ th.num{text-align:right}
         li.appendChild(top);
         if (c.note){ const n = document.createElement("div"); n.style.whiteSpace = "pre-wrap"; n.style.marginTop = "2px"; n.textContent = c.note; li.appendChild(n); }
         const m = document.createElement("div"); m.className = "meta"; m.textContent = `${nameOf(c.by) || "Someone"} · ${when(c.at)}`; li.appendChild(m);
+        if (!readOnly && (isAdmin || c.by === myId)){
+          const u = document.createElement("button"); u.className = "linkbtn"; u.textContent = "Undo";
+          u.title = c.prev && d.lastCallAt === c.at ? "Remove this call and put the lead back the way it was" : "Remove this entry from the history";
+          u.onclick = async () => { if (!confirm(c.prev && d.lastCallAt === c.at ? `Undo this “${DISPO_NAME[c.disposition] || c.disposition}”? The lead goes back to ${STAGE_NAME[c.prev.stage] || c.prev.stage}${c.prev.followUp ? ", follow-up " + c.prev.followUp : ""}.` : "Remove this entry from the call history?")) return; await undoCall(c.id); };
+          li.appendChild(u);
+        }
         ul.appendChild(li);
       });
       sh.appendChild(ul);
@@ -1658,8 +1744,22 @@ Reply with JSON only: {"text": "...", "email": "..."}`;
     const id = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || ("rep-" + Date.now());
     await saveRep(id, { name, linkedUser: "" }); $("newRep").value = "";
   };
+  let TR = new Map();
+  function renderTrash(){
+    $("trashBox").classList.toggle("hidden", !isAdmin || !rdb); if (!isAdmin) return;
+    const tb = $("trashRows"); tb.innerHTML = "";
+    const list = [...TR.entries()].filter(([id]) => !L.has(id)).sort((a, b) => String(b[1].deletedAt).localeCompare(String(a[1].deletedAt))).slice(0, 50);
+    if (!list.length){ const tr = document.createElement("tr"); const td = document.createElement("td"); td.colSpan = 4; td.className = "empty"; td.textContent = "Nothing removed."; tr.appendChild(td); tb.appendChild(tr); return; }
+    list.forEach(([id, t]) => {
+      const tr = document.createElement("tr");
+      [t.lead?.name || id, nameOf(t.deletedBy) || "—", when(t.deletedAt)].forEach((v, i) => { const td = document.createElement("td"); td.textContent = v; if (!i) td.className = "name"; tr.appendChild(td); });
+      const td = document.createElement("td"); const b = document.createElement("button"); b.className = "ghost small"; b.textContent = "Restore";
+      b.onclick = async () => { b.disabled = true; await restoreLead(id, t.lead || {}, t.assignTo || ""); toast(`Restored ${t.lead?.name || "lead"}`); };
+      td.appendChild(b); tr.appendChild(td); tb.appendChild(tr);
+    });
+  }
   function renderDash(){
-    renderTeam();
+    renderTeam(); renderTrash();
     const rs = repStats();
     const sum = k => rs.reduce((a, r) => a + r[k], 0);
     const calls = sum("calls"), talked = sum("talked"), demos = sum("demos");
@@ -1686,6 +1786,7 @@ Reply with JSON only: {"text": "...", "email": "..."}`;
   $("thAuto").onclick = () => setTheme("auto"); $("thLight").onclick = () => setTheme("light"); $("thDark").onclick = () => setTheme("dark");
   setTheme(document.documentElement.dataset.theme || "auto");
 
+  $("gvHelp").onclick = () => pStatus("One-click calling with Google Voice (computers): open voice.google.com in Chrome or Edge, signed in to the Google Voice account you call from. When asked, allow it to open phone links (or click “Register now” in the blue banner). Then choose “One-click” here: tapping a number dials it in Google Voice. On a phone: tapping a number opens the phone app; on Android you can set the Voice app to place calls. Calls are logged under whoever is signed in to this CRM, even if you share one Google Voice number.");
   $("callVia").value = callVia;
   $("callVia").onchange = () => { callVia = $("callVia").value; try { localStorage.setItem("sm-callvia", callVia); } catch {} renderAll(); };
 
@@ -1696,7 +1797,7 @@ Reply with JSON only: {"text": "...", "email": "..."}`;
   if (window.__STANDALONE) setView("pipe");
 
   // test hook (harmless in production)
-  window.__crm = { assignMany, assignees, isMine, canon, nameOf, flush, ldb, get state(){ return { L, C, A, OUT, CONF, online, myId, isAdmin }; }, resolveConflict, logCall, patchLead, createLead, assignLead, planImport, buildCsv, pipeList, repStats, setPeriod: p => { period = p; } };
+  window.__crm = { undoCall, restoreLead, deleteLead, get trash(){ return TR; }, assignMany, assignees, isMine, canon, nameOf, flush, ldb, get state(){ return { L, C, A, OUT, CONF, online, myId, isAdmin }; }, resolveConflict, logCall, patchLead, createLead, assignLead, planImport, buildCsv, pipeList, repStats, setPeriod: p => { period = p; } };
 })();
 </script>
 <script>
