@@ -367,6 +367,17 @@ th.num{text-align:right}
         <tbody id="dRows"></tbody>
       </table>
     </div>
+    <h2 style="font-size:22px;letter-spacing:-.02em;margin:40px 2px 6px">Calls</h2>
+    <p class="note" style="margin:0 2px 14px">Every call counted above, newest first. Remove one logged by mistake, or add a call that wasn’t logged.</p>
+    <div class="card" style="padding:16px;margin-bottom:12px" id="addCallBox">
+      <div class="grid2" style="grid-template-columns:2fr 1fr">
+        <div><label for="acLead">Lead</label><input id="acLead" list="acLeads" placeholder="Start typing a business name" autocomplete="off"><datalist id="acLeads"></datalist></div>
+        <div><label for="acOutcome">Outcome</label><select id="acOutcome"></select></div>
+      </div>
+      <div class="field"><label for="acNote">Note</label><input id="acNote" placeholder="Optional" autocomplete="off"></div>
+      <div class="toolbar" style="margin:12px 0 0"><button class="primary small" id="acAdd">Add call</button><span id="acMsg" class="who" style="margin:0"></span></div>
+    </div>
+    <div class="tablewrap"><table style="min-width:680px"><thead><tr><th>When</th><th>Lead</th><th>Outcome</th><th>By</th><th>Note</th><th></th></tr></thead><tbody id="callRows"></tbody></table></div>
     <div id="trashBox" class="hidden">
       <h2 style="font-size:22px;letter-spacing:-.02em;margin:40px 2px 6px">Recently removed</h2>
       <p class="note" style="margin:0 2px 14px">Leads removed by mistake can be restored with their stage, notes, follow-up and owner.</p>
@@ -514,6 +525,25 @@ th.num{text-align:right}
   function msg(el, text, err){ el.innerHTML = ""; if (!text) return; const d = document.createElement("div"); d.className = "msg" + (err ? " err" : ""); d.textContent = text; el.appendChild(d); }
   const status = (t, e) => msg($("status"), t, e);
   const pStatus = (t, e) => msg($("pStatus"), t, e);
+  // in-app "Are you sure?" (the browser's own pop-up is silently blocked inside Claude)
+  function ask(text, okLabel = "OK", danger = false){
+    return new Promise(resolve => {
+      let m = $("askModal");
+      if (!m){ m = document.createElement("div"); m.id = "askModal"; m.className = "modal"; m.setAttribute("role", "alertdialog"); document.body.appendChild(m); }
+      m.innerHTML = "";
+      const p = document.createElement("p"); p.style.cssText = "font-size:16px;margin:0;line-height:1.45"; p.textContent = text; m.appendChild(p);
+      const act = document.createElement("div"); act.className = "actions";
+      const no = document.createElement("button"); no.className = "ghost"; no.textContent = "Cancel";
+      const yes = document.createElement("button"); yes.className = "primary"; yes.textContent = okLabel; if (danger) yes.style.background = "var(--red)";
+      act.append(no, yes); m.appendChild(act);
+      const scrim = $("scrim"); const sheetOpen = $("sheet").classList.contains("show");
+      const done = v => { m.classList.remove("show"); if (!sheetOpen) scrim.classList.remove("show"); scrim.style.zIndex = ""; document.removeEventListener("keydown", key); resolve(v); };
+      const key = e => { if (e.key === "Escape") done(false); if (e.key === "Enter") done(true); };
+      no.onclick = () => done(false); yes.onclick = () => done(true);
+      document.addEventListener("keydown", key);
+      scrim.style.zIndex = "21"; scrim.classList.add("show"); m.style.zIndex = "30"; m.classList.add("show"); yes.focus();
+    });
+  }
   // small "Undo" bar at the bottom of the screen
   let toastTimer = null;
   function toast(text, action, fn){
@@ -1358,7 +1388,7 @@ th.num{text-align:right}
     const list = pipeList(); if (!list.length) return;
     const reps = v === "__split" ? splitTargets() : assignees();
     const label = v === "__split" ? `split evenly between ${reps.map(r => r[1]).join(", ")}` : v === "__none" ? "unassign" : nameOf(v);
-    if (!confirm(`${label === "unassign" ? "Unassign" : "Assign"} ${list.length} lead${list.length === 1 ? "" : "s"}${label === "unassign" ? "" : " to " + label}?`)) return;
+    if (!(await ask(`${label === "unassign" ? "Unassign" : "Assign"} ${list.length} lead${list.length === 1 ? "" : "s"}${label === "unassign" ? "" : " to " + label}?`, label === "unassign" ? "Unassign" : "Assign"))) return;
     // split: hottest leads first, dealt round-robin so every rep gets the same mix
     const ordered = [...list].sort((a, b) => (b.score || 0) - (a.score || 0));
     const pairs = ordered.map((d, i) => [d.id, v === "__split" ? reps[i % reps.length][0] : v === "__none" ? "" : v]).filter(([id, to]) => ownerOf(id) !== to);
@@ -1419,13 +1449,21 @@ th.num{text-align:right}
     DISPO.forEach(([k, label, tone]) => {
       const b = document.createElement("button"); b.textContent = label; if (tone) b.classList.add(tone); b.disabled = readOnly;
       b.onclick = async () => {
-        if (k === "dnc" && !confirm(`Mark ${d.name} as do not call?`)) return;
+        if (k === "dnc" && !(await ask(`Mark ${d.name} as do not call?`, "Do not call", true))) return;
         const n = note.value.trim(); sheetDraftNote = ""; callingId = null;
         const cid = await logCall(d.id, k, n, $("fuDate")?.value || "");
         if (cid) toast(`Logged “${label}” for ${d.name}`, "Undo", () => undoCall(cid));
       };
       grid.appendChild(b);
     });
+    const none = document.createElement("button"); none.textContent = "None (clear outcome)"; none.disabled = readOnly; none.style.gridColumn = "1 / -1"; none.style.color = "var(--muted)";
+    none.onclick = async () => {
+      const before = { stage: d.stage || "new", followUp: d.followUp || "", lastDisposition: d.lastDisposition || "", lastCallAt: d.lastCallAt || "", lastCallBy: d.lastCallBy || "" };
+      callingId = null;
+      await patchLead(d.id, { stage: "none", followUp: "", lastDisposition: "", lastCallAt: "", lastCallBy: "" });
+      toast(`Cleared the outcome for ${d.name}`, "Undo", () => patchLead(d.id, before));
+    };
+    grid.appendChild(none);
     sh.appendChild(grid);
     const noteOnly = document.createElement("button"); noteOnly.className = "linkbtn"; noteOnly.textContent = "Save as note without a call"; noteOnly.disabled = readOnly;
     noteOnly.onclick = async () => { const n = note.value.trim(); if (!n) return; sheetDraftNote = ""; await logCall(d.id, "note", n); };
@@ -1471,6 +1509,22 @@ th.num{text-align:right}
     const ta = document.createElement("textarea"); ta.id = "leadNotes"; ta.value = d.notes || ""; ta.placeholder = "Anything to remember about this business"; ta.disabled = readOnly;
     ta.onchange = () => { if (ta.value !== (d.notes || "")) patchLead(d.id, { notes: ta.value.slice(0, 4000) }); };
     s5.appendChild(ta); sh.appendChild(s5);
+    // everything above also saves on its own; this button saves anything still being typed and confirms it
+    const saveRow = document.createElement("div"); saveRow.className = "rowbtns"; saveRow.style.marginTop = "14px";
+    const saveBtn = document.createElement("button"); saveBtn.className = "primary"; saveBtn.textContent = "Save changes"; saveBtn.disabled = readOnly; saveBtn.id = "saveLeadBtn";
+    saveBtn.onclick = async () => {
+      const cur = L.get(d.id) || d, patch = {};
+      if (sel.value !== (cur.stage || "new")) patch.stage = sel.value;
+      if (fu.value !== (cur.followUp || "")) patch.followUp = fu.value;
+      if (em.value.trim() !== (cur.contactEmail || "")) patch.contactEmail = em.value.trim();
+      if (ta.value !== (cur.notes || "")) patch.notes = ta.value.slice(0, 4000);
+      if (patch.stage && CLOSED.includes(patch.stage)) patch.followUp = "";
+      if (Object.keys(patch).length) await patchLead(d.id, patch);
+      toast(navigator.onLine ? "Saved" : "Saved on this device · syncs when you’re online");
+    };
+    const pend = OUT.some(o => o.docId === d.id);
+    const st0 = document.createElement("span"); st0.className = "who"; st0.style.margin = "0"; st0.textContent = pend ? "Waiting to sync" : "All changes saved";
+    saveRow.append(saveBtn, st0); sh.appendChild(saveRow);
 
     // drafts (existing feature)
     const h3c = document.createElement("h3"); h3c.textContent = "Outreach"; sh.appendChild(h3c);
@@ -1497,7 +1551,7 @@ th.num{text-align:right}
         if (!readOnly && (isAdmin || c.by === myId)){
           const u = document.createElement("button"); u.className = "linkbtn"; u.textContent = "Undo";
           u.title = c.prev && d.lastCallAt === c.at ? "Remove this call and put the lead back the way it was" : "Remove this entry from the history";
-          u.onclick = async () => { if (!confirm(c.prev && d.lastCallAt === c.at ? `Undo this “${DISPO_NAME[c.disposition] || c.disposition}”? The lead goes back to ${STAGE_NAME[c.prev.stage] || c.prev.stage}${c.prev.followUp ? ", follow-up " + c.prev.followUp : ""}.` : "Remove this entry from the call history?")) return; await undoCall(c.id); };
+          u.onclick = async () => { if (!(await ask(c.prev && d.lastCallAt === c.at ? `Undo this “${DISPO_NAME[c.disposition] || c.disposition}”? The lead goes back to ${STAGE_NAME[c.prev.stage] || c.prev.stage}${c.prev.followUp ? ", follow-up " + c.prev.followUp : ""}.` : "Remove this entry from the call history?", "Undo"))) return; await undoCall(c.id); toast("Call removed"); };
           li.appendChild(u);
         }
         ul.appendChild(li);
@@ -1506,7 +1560,7 @@ th.num{text-align:right}
     }
     if (isAdmin){
       const del = document.createElement("button"); del.className = "linkbtn danger"; del.style.marginTop = "22px"; del.textContent = "Remove lead";
-      del.onclick = async () => { if (!confirm(`Remove ${d.name} from the pipeline? Its call history stays in the dashboard.`)) return; closeSheet(); await deleteLead(d.id); };
+      del.onclick = async () => { if (!(await ask(`Remove ${d.name} from the pipeline? You can undo this, or restore it later from Dashboard → Recently removed.`, "Remove", true))) return; closeSheet(); await deleteLead(d.id); };
       sh.appendChild(del);
     }
     if (keepFocus && $(keepFocus)) $(keepFocus).focus();
@@ -1726,7 +1780,7 @@ Reply with JSON only: {"text": "...", "email": "..."}`;
       const c3 = document.createElement("td"); c3.className = "num"; c3.textContent = counts["r:" + r.id] || 0;
       const c4 = document.createElement("td");
       if (isAdmin){ const b = document.createElement("button"); b.className = "linkbtn danger"; b.textContent = "Remove";
-        b.onclick = async () => { if (!confirm(`Remove ${r.name} from the team? Leads assigned to them stay assigned until you reassign them.`)) return; await removeRep(r.id); };
+        b.onclick = async () => { if (!(await ask(`Remove ${r.name} from the team? Leads assigned to them stay assigned until you reassign them.`, "Remove", true))) return; await removeRep(r.id); };
         c4.appendChild(b); }
       tr.append(c1, c2, c3, c4); tb.appendChild(tr);
     });
@@ -1761,8 +1815,43 @@ Reply with JSON only: {"text": "...", "email": "..."}`;
       td.appendChild(b); tr.appendChild(td); tb.appendChild(tr);
     });
   }
+  function renderCalls(){
+    const since = period ? (() => { const x = new Date(); x.setHours(0,0,0,0); x.setDate(x.getDate() - (period - 1)); return x.toISOString(); })() : "";
+    const list = [...C.values()].filter(c => c.disposition !== "note" && (!since || String(c.at) >= since)).sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 100);
+    const tb = $("callRows"); tb.innerHTML = "";
+    if (!list.length){ const tr = document.createElement("tr"); const td = document.createElement("td"); td.colSpan = 6; td.className = "empty"; td.textContent = "No calls in this period."; tr.appendChild(td); tb.appendChild(tr); }
+    list.forEach(c => {
+      const tr = document.createElement("tr");
+      [when(c.at), (L.get(c.leadId) || {}).name || c.leadName || "Removed lead", DISPO_NAME[c.disposition] || c.disposition, nameOf(c.by) || "—", c.note || ""].forEach((v, i) => {
+        const td = document.createElement("td"); td.textContent = v; if (i === 1) td.className = "name"; if (i === 4){ td.className = "cat"; td.style.maxWidth = "28ch"; } tr.appendChild(td); });
+      const td = document.createElement("td");
+      if (!readOnly && (isAdmin || c.by === myId)){
+        const b = document.createElement("button"); b.className = "linkbtn danger"; b.textContent = "Remove";
+        b.onclick = async () => {
+          const lead = L.get(c.leadId), restores = lead && c.prev && lead.lastCallAt === c.at;
+          if (!(await ask(`Remove this “${DISPO_NAME[c.disposition] || c.disposition}” call${lead ? " on " + lead.name : ""}? It stops counting on the dashboard.${restores ? ` The lead goes back to ${STAGE_NAME[c.prev.stage] || c.prev.stage}.` : ""}`, "Remove", true))) return;
+          await undoCall(c.id); toast("Call removed");
+        };
+        td.appendChild(b);
+      }
+      tr.appendChild(td); tb.appendChild(tr);
+    });
+    // add a call by hand
+    const dl = $("acLeads"); if (dl.dataset.n !== String(L.size)){ dl.innerHTML = ""; [...L.values()].sort((a, b) => String(a.name).localeCompare(String(b.name))).forEach(l => { const o = document.createElement("option"); o.value = l.name + (l.city ? " — " + l.city : ""); dl.appendChild(o); }); dl.dataset.n = String(L.size); }
+    const sel = $("acOutcome"); if (!sel.options.length) DISPO.forEach(([k, n]) => { const o = document.createElement("option"); o.value = k; o.textContent = n; sel.appendChild(o); });
+    $("addCallBox").classList.toggle("hidden", readOnly);
+  }
+  $("acAdd").onclick = async () => {
+    const v = $("acLead").value.trim();
+    const lead = [...L.values()].find(l => (l.name + (l.city ? " — " + l.city : "")) === v) || [...L.values()].find(l => l.name === v);
+    if (!lead){ $("acMsg").textContent = "Pick a lead from the list."; return; }
+    const k = $("acOutcome").value, label = DISPO_NAME[k];
+    const cid = await logCall(lead.id, k, $("acNote").value.trim(), "");
+    $("acLead").value = ""; $("acNote").value = ""; $("acMsg").textContent = "";
+    if (cid) toast(`Added “${label}” for ${lead.name}`, "Undo", () => undoCall(cid));
+  };
   function renderDash(){
-    renderTeam(); renderTrash();
+    renderTeam(); renderTrash(); renderCalls();
     const rs = repStats();
     const sum = k => rs.reduce((a, r) => a + r[k], 0);
     const calls = sum("calls"), talked = sum("talked"), demos = sum("demos");
@@ -1802,7 +1891,7 @@ Reply with JSON only: {"text": "...", "email": "..."}`;
   if (window.__STANDALONE) setView("pipe");
 
   // test hook (harmless in production)
-  window.__crm = { undoCall, restoreLead, deleteLead, get trash(){ return TR; }, assignMany, assignees, isMine, canon, nameOf, flush, ldb, get state(){ return { L, C, A, OUT, CONF, online, myId, isAdmin }; }, resolveConflict, logCall, patchLead, createLead, assignLead, planImport, buildCsv, pipeList, repStats, setPeriod: p => { period = p; } };
+  window.__crm = { ask, undoCall, restoreLead, deleteLead, get trash(){ return TR; }, assignMany, assignees, isMine, canon, nameOf, flush, ldb, get state(){ return { L, C, A, OUT, CONF, online, myId, isAdmin }; }, resolveConflict, logCall, patchLead, createLead, assignLead, planImport, buildCsv, pipeList, repStats, setPeriod: p => { period = p; } };
 })();
 </script>
 <script>
@@ -1931,8 +2020,10 @@ Reply with JSON only: {"text": "...", "email": "..."}`;
     }
   };
   const signOut = async () => { try { await auth.signOut(); } catch {} location.reload(); };
+  // same in-app confirmation the CRM uses (no browser pop-ups)
+  const ask = (t, ok, danger) => window.__crm?.ask ? window.__crm.ask(t, ok, danger) : Promise.resolve(window.confirm(t));
   $("gateSignOut").onclick = signOut;
-  $("signOutBtn").onclick = () => { if (confirm("Sign out of Strata Marquee CRM on this device? Changes not yet synced stay saved here for next time.")) signOut(); };
+  $("signOutBtn").onclick = async () => { if (await ask("Sign out of Strata Marquee CRM on this device? Changes not yet synced stay saved here for next time.", "Sign out")) signOut(); };
 
   let ownDocUnsub = null;
   auth.onAuthStateChanged(async u => {
@@ -1999,7 +2090,7 @@ Reply with JSON only: {"text": "...", "email": "..."}`;
         const ok = document.createElement("button"); ok.className = "primary small"; ok.textContent = "Approve";
         ok.onclick = async () => { ok.disabled = true; try { await fs.collection("members").doc(d.id).update({ approved: true, approvedAt: new Date().toISOString() }); } catch(e){ alert("Couldn’t approve: " + (e.code || e.message)); ok.disabled = false; } };
         const no = document.createElement("button"); no.className = "linkbtn danger"; no.textContent = "Deny";
-        no.onclick = async () => { if (!confirm(`Deny ${m.email}? They can ask again by signing in.`)) return; try { await fs.collection("members").doc(d.id).delete(); } catch {} };
+        no.onclick = async () => { if (!(await ask(`Deny ${m.email}? They can ask again by signing in.`, "Deny", true))) return; try { await fs.collection("members").doc(d.id).delete(); } catch {} };
         row.append(ok, no); td.appendChild(row); tr.appendChild(td); tb.appendChild(tr);
       });
     }, () => {});
@@ -2008,7 +2099,7 @@ Reply with JSON only: {"text": "...", "email": "..."}`;
       const f = $("restoreFile").files[0]; if (!f) return;
       let data; try { data = JSON.parse(await f.text()); } catch { return note("That file isn’t a backup from the Claude version.", true); }
       if (!data || data.format !== "strata-crm-backup-v1") return note("That file isn’t a backup from the Claude version.", true);
-      if (!confirm(`Import ${Object.keys(data.leads).length} leads, ${Object.keys(data.calls).length} calls, ${Object.keys(data.assign).length} assignments and ${Object.keys(data.roster).length} team members? Records already here are kept as they are.`)) return;
+      if (!(await ask(`Import ${Object.keys(data.leads).length} leads, ${Object.keys(data.calls).length} calls, ${Object.keys(data.assign).length} assignments and ${Object.keys(data.roster).length} team members? Records already here are kept as they are.`, "Import"))) return;
       try { const r = await importBackup(data); note(`Imported ${r.added} records${r.skipped ? ` · ${r.skipped} already here, left as they were` : ""}. Everything syncs to your reps automatically.`); }
       catch(e){ note("Import stopped (" + (mapErr(e).code) + "). Check your connection and run it again; nothing will be doubled.", true); }
     };
