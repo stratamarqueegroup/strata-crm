@@ -1,0 +1,81 @@
+rules_version = '2';
+// Strata Marquee CRM — Firestore security rules
+//
+// Admins = stratamarqueegroup@gmail.com, rhovie.stratamarqueegroup@gmail.com,
+//          admin.stratamarqueegroup@gmail.com: everything, all three equal.
+// Rep    = an approved team member: sees and works only the leads assigned to them,
+//          logs their own calls, cannot add, delete, import or assign leads, cannot manage the team.
+// Anyone else who signs in can only ask for access.
+//
+// Collections the app uses:
+//   leads/{leadId}     a lead. assignedUid = the rep's Google account (set by the admin's app)
+//   calls/{callId}     one call or note. by = who logged it, leadId = which lead
+//   assign/{leadId}    the admin's assignment list (to = "r:<rep>" or an account)
+//   roster/{repId}     team list: name + linkedUser (the rep's Google account)
+//   members/{uid}      everyone who signed in: name, email, approved
+//   leases/{id}        short write locks used while syncing
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn()   { return request.auth != null; }
+    function verified()   { return signedIn() && request.auth.token.email_verified == true; }
+    function email()      { return request.auth.token.email.lower(); }
+    function isAdmin()    { return verified() && email() in ['stratamarqueegroup@gmail.com', 'rhovie.stratamarqueegroup@gmail.com', 'admin.stratamarqueegroup@gmail.com']; }
+    // reps you approved by email in advance: allowed to mark themselves approved on first sign-in
+    function preApproved(){ return verified() && email() in ['rhovie.stratamarqueegroup@gmail.com', 'admin.stratamarqueegroup@gmail.com']; }
+    function memberPath() { return /databases/$(database)/documents/members/$(request.auth.uid); }
+    function isRep()      { return signedIn() && exists(memberPath()) && get(memberPath()).data.approved == true; }
+    function canWork()    { return isAdmin() || isRep(); }
+    function leadOwner(leadId) { return get(/databases/$(database)/documents/leads/$(leadId)).data.get('assignedUid', ''); }
+
+    // ---------------- leads ----------------
+    match /leads/{leadId} {
+      // reps read only their own leads (their app asks with: where assignedUid == their account)
+      allow read: if isAdmin() || (isRep() && resource.data.assignedUid == request.auth.uid);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isRep()
+        && resource.data.get('assignedUid', '') == request.auth.uid
+        // reps may change only these fields: status, follow-up, notes, contact email, call outcome, drafts, sync stamps
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'stage', 'followUp', 'notes', 'contactEmail',
+             'lastDisposition', 'lastCallAt', 'lastCallBy',
+             'text', 'email', 'rev', 'updatedAt', 'updatedBy'])
+        && request.resource.data.get('updatedBy', '') == request.auth.uid
+        && request.resource.data.get('stage', 'new') in ['new', 'contacted', 'replied', 'demo', 'won', 'lost', 'dnc']
+      );
+    }
+
+    // ---------------- call log ----------------
+    match /calls/{callId} {
+      allow read: if isAdmin() || (isRep() && resource.data.by == request.auth.uid);
+      // a rep logs calls under their own name, on leads assigned to them
+      allow create: if isAdmin() || (isRep()
+        && request.resource.data.by == request.auth.uid
+        && leadOwner(request.resource.data.leadId) == request.auth.uid);
+      // the app may re-send the same call after a dropped connection; it can never change who logged it
+      allow update: if isAdmin() || (isRep()
+        && resource.data.by == request.auth.uid
+        && request.resource.data.by == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // ---------------- assignments and team: admin only ----------------
+    match /assign/{leadId} { allow read, write: if isAdmin(); }
+    match /roster/{repId}  { allow read: if canWork(); allow write: if isAdmin(); }
+
+    // ---------------- sync locks ----------------
+    match /leases/{id} { allow read, write: if canWork(); }
+
+    // ---------------- people ----------------
+    match /members/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid) || isRep();
+      allow create: if isAdmin() || (signedIn() && request.auth.uid == uid
+        && (request.resource.data.approved == false || (preApproved() && request.resource.data.approved == true)));
+      allow update: if isAdmin() || (signedIn() && request.auth.uid == uid
+        && (request.resource.data.approved == resource.data.approved || (preApproved() && request.resource.data.approved == true)));
+      allow delete: if isAdmin();
+    }
+  }
+}
