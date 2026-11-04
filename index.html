@@ -1,0 +1,1971 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Strata Marquee CRM</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Strata CRM">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/dexie@4.4.6/dist/dexie.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
+<script>
+  // apply the saved theme before first paint
+  try { const t = localStorage.getItem("sm-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}
+</script>
+<style>
+:root{
+  --bg:#f5f5f7; --surface:#ffffff; --surface-2:#fbfbfd; --fill:rgba(120,120,128,.12); --fill-2:rgba(120,120,128,.08);
+  --ink:#1d1d1f; --ink-2:#424245; --muted:#6e6e73; --faint:#86868b; --hair:rgba(0,0,0,.08);
+  --blue:#0071e3; --blue-ink:#ffffff; --blue-soft:rgba(0,113,227,.10);
+  --green:#1d8a3a; --green-soft:rgba(52,199,89,.14);
+  --amber:#a05a00; --amber-soft:rgba(255,159,10,.16);
+  --red:#d70015; --red-soft:rgba(255,59,48,.10);
+  --nav:rgba(251,251,253,.78); --shadow:0 1px 2px rgba(0,0,0,.04), 0 8px 28px rgba(0,0,0,.05);
+  --font:-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
+  --mono:"SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme:light; box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#000000; --surface:#1c1c1e; --surface-2:#161618; --fill:rgba(120,120,128,.32); --fill-2:rgba(120,120,128,.20);
+    --ink:#f5f5f7; --ink-2:#d2d2d7; --muted:#a1a1a6; --faint:#86868b; --hair:rgba(255,255,255,.10);
+    --blue:#2997ff; --blue-ink:#ffffff; --blue-soft:rgba(41,151,255,.16);
+    --green:#30d158; --green-soft:rgba(48,209,88,.16);
+    --amber:#ffb340; --amber-soft:rgba(255,179,64,.16);
+    --red:#ff6961; --red-soft:rgba(255,69,58,.16);
+    --nav:rgba(22,22,24,.72); --shadow:0 0 0 1px rgba(255,255,255,.06);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#000000; --surface:#1c1c1e; --surface-2:#161618; --fill:rgba(120,120,128,.32); --fill-2:rgba(120,120,128,.20);
+  --ink:#f5f5f7; --ink-2:#d2d2d7; --muted:#a1a1a6; --faint:#86868b; --hair:rgba(255,255,255,.10);
+  --blue:#2997ff; --blue-ink:#ffffff; --blue-soft:rgba(41,151,255,.16);
+  --green:#30d158; --green-soft:rgba(48,209,88,.16);
+  --amber:#ffb340; --amber-soft:rgba(255,179,64,.16);
+  --red:#ff6961; --red-soft:rgba(255,69,58,.16);
+  --nav:rgba(22,22,24,.72); --shadow:0 0 0 1px rgba(255,255,255,.06);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 64px);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.47;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--nav);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
+
+/* ---------- top bar ---------- */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--nav);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--hair)}
+.nav-in{max-width:1120px;margin:0 auto;padding:10px 22px;display:flex;align-items:center;gap:16px;justify-content:space-between}
+.brand{font-weight:600;font-size:15px;letter-spacing:-.01em;white-space:nowrap}
+.brand span{color:var(--muted);font-weight:400}
+.navright{display:flex;align-items:center;gap:10px}
+
+/* segmented control */
+.seg{display:inline-flex;background:var(--fill-2);border-radius:9px;padding:2px;gap:2px}
+.seg button{all:unset;cursor:pointer;padding:5px 14px;border-radius:7px;font-size:13px;font-weight:500;color:var(--ink-2);white-space:nowrap;transition:background .15s,color .15s}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg button:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.seg .count{font-variant-numeric:tabular-nums;color:var(--muted);margin-left:5px;font-weight:400}
+.seg.small button{padding:4px 10px;font-size:12px}
+
+/* ---------- page ---------- */
+.wrap{max-width:1120px;margin:0 auto;padding:56px 22px 72px}
+.hero{margin:0 0 36px}
+.eyebrow{font-size:14px;font-weight:600;color:var(--blue);margin:0 0 6px;letter-spacing:-.01em}
+h1{font-size:clamp(34px,5.2vw,52px);line-height:1.06;letter-spacing:-.028em;font-weight:700;margin:0 0 12px}
+h1 em{font-style:normal;color:var(--muted)}
+.sub{font-size:clamp(17px,2vw,19px);line-height:1.42;color:var(--muted);max-width:56ch;margin:0;letter-spacing:-.016em}
+
+.modes{margin:0 0 14px}
+.card{background:var(--surface);border-radius:18px;box-shadow:var(--shadow)}
+.search{padding:20px;display:grid;grid-template-columns:1.3fr 1.3fr .8fr auto;gap:14px;align-items:end}
+@media (max-width:820px){.search{grid-template-columns:1fr 1fr}.search .go{grid-column:1/-1}}
+.extra{grid-column:1/-1;display:grid;grid-template-columns:1fr 2fr;gap:14px;padding-top:14px;border-top:1px solid var(--hair)}
+@media (max-width:820px){.extra{grid-template-columns:1fr}}
+label{display:block;font-size:12px;font-weight:500;color:var(--muted);margin:0 0 6px 2px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--fill-2);border:1px solid transparent;border-radius:10px;transition:border-color .15s,background .15s,box-shadow .15s}
+input,select{width:100%;font-size:15px;padding:10px 12px;height:40px}
+select{appearance:none;-webkit-appearance:none;padding-right:30px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 15px) 17px,calc(100% - 10px) 17px;background-size:5px 5px;background-repeat:no-repeat}
+input:focus,select:focus,textarea:focus{outline:none;background:var(--surface);border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-soft)}
+input::placeholder,textarea::placeholder{color:var(--faint)}
+button{font:inherit;cursor:pointer;border:0;border-radius:980px;padding:10px 20px;font-weight:500;font-size:15px;letter-spacing:-.01em;transition:opacity .15s,background .15s}
+.primary{background:var(--blue);color:var(--blue-ink)}
+.primary:hover{opacity:.88}
+.ghost{background:var(--fill-2);color:var(--blue)}
+.ghost:hover{background:var(--fill)}
+.small{padding:6px 14px;font-size:13px}
+button:disabled{opacity:.4;cursor:default}
+.go button{height:40px}
+.note{font-size:13px;color:var(--muted);line-height:1.45}
+.tipline{margin:14px 2px 0}
+.quick{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0}
+.chip{background:var(--surface);color:var(--ink-2);border-radius:980px;padding:6px 13px;font-size:13px;font-weight:400;box-shadow:var(--shadow)}
+.chip:hover{color:var(--blue)}
+
+.msg{margin:18px 0 0;padding:12px 16px;border-radius:12px;background:var(--surface);box-shadow:var(--shadow);font-size:14px;color:var(--ink-2)}
+.msg.err{color:var(--red);background:var(--red-soft);box-shadow:none}
+
+/* ---------- results ---------- */
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin:40px 2px 14px}
+.stats{display:flex;gap:28px;flex-wrap:wrap}
+.stats span{display:flex;flex-direction:column;font-size:13px;color:var(--muted)}
+.stats b{font-size:28px;font-weight:600;letter-spacing:-.025em;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1}
+.s-lead b{color:var(--green)} .s-weak b{color:var(--amber)}
+.tools{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.check{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--ink-2);margin:0;cursor:pointer}
+.check input{width:16px;height:16px;accent-color:var(--blue);padding:0}
+
+.tablewrap{background:var(--surface);border-radius:18px;box-shadow:var(--shadow);overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:860px}
+th{text-align:left;font-size:12px;font-weight:500;color:var(--muted);padding:14px 18px 10px;border-bottom:1px solid var(--hair)}
+td{padding:16px 18px;vertical-align:top;font-size:14px;border-bottom:1px solid var(--hair)}
+tr:last-child td{border-bottom:0}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:var(--surface-2)}
+.name{font-weight:600;font-size:15px;letter-spacing:-.012em}
+.name a{color:inherit;text-decoration:none}
+.name a:hover{color:var(--blue)}
+.cat{font-size:13px;color:var(--muted);margin-top:2px}
+.reason{font-size:13.5px;color:var(--ink-2);line-height:1.5;max-width:46ch}
+.mono{font-family:var(--font);font-variant-numeric:tabular-nums;font-size:14px;white-space:nowrap}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:3px 10px;border-radius:980px;white-space:nowrap;letter-spacing:-.005em}
+.t-hot,.t-lead{background:var(--green-soft);color:var(--green)}
+.t-good,.t-weak{background:var(--amber-soft);color:var(--amber)}
+.t-low,.t-has{background:var(--fill-2);color:var(--muted)}
+.score{font-size:12px;color:var(--faint);margin-top:5px;font-variant-numeric:tabular-nums}
+.saved{font-size:13px;color:var(--green);font-weight:500;white-space:nowrap}
+
+.draft{margin-top:10px;padding:12px 14px;border-radius:12px;background:var(--fill-2);font-size:13px;line-height:1.5;white-space:pre-wrap;color:var(--ink-2);max-width:42ch}
+.draft h4{margin:0 0 4px;font-size:12px;font-weight:600;color:var(--muted)}
+.draft + .draft{margin-top:8px}
+.empty{padding:56px 20px;text-align:center;color:var(--muted);font-size:15px}
+.hidden{display:none!important}
+.foot{margin:28px 2px 0;font-size:12px;color:var(--faint);max-width:80ch;line-height:1.5}
+
+/* ---------- pipeline ---------- */
+.stages{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.stage{display:flex;align-items:baseline;gap:7px;background:var(--surface);box-shadow:var(--shadow);border-radius:980px;padding:7px 15px;color:var(--ink-2);font-weight:500;font-size:13px}
+.stage b{font-size:13px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.stage.on{background:var(--ink);color:var(--bg)}
+.stage.on b{color:var(--bg)}
+.stage.due b{color:var(--red)}
+.stage.due.on b{color:var(--bg)}
+.pfilters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.pfilters input{max-width:300px}
+.pfilters select{width:auto;min-width:160px}
+td select{width:auto;min-width:140px;height:34px;padding:6px 28px 6px 10px;font-size:13.5px;background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px}
+td input[type=date]{width:auto;height:34px;padding:6px 10px;font-size:13.5px}
+td textarea{width:100%;min-width:190px;min-height:64px;font-size:13.5px;padding:9px 11px;resize:vertical;line-height:1.45}
+.overdue{color:var(--red);font-size:12px;font-weight:600;margin-top:6px}
+.who{font-size:12px;color:var(--faint);margin-top:6px}
+.rowbtns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.linkbtn{background:none;border:0;padding:4px 0;color:var(--blue);font-size:13px;font-weight:400;border-radius:4px}
+.linkbtn:hover{text-decoration:underline}
+.danger{color:var(--red)}
+
+/* ---------- CRM ---------- */
+.sync{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:500;color:var(--ink-2);background:var(--fill-2);padding:5px 11px;border-radius:980px;white-space:nowrap;border:0;cursor:default}
+.sync i{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none}
+.sync.off i{background:var(--faint)} .sync.busy i{background:var(--blue);animation:blink 1s infinite} .sync.pend i{background:var(--amber)} .sync.warn i{background:var(--red)}
+.sync.warn{cursor:pointer;color:var(--red)}
+@keyframes blink{50%{opacity:.3}}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.toolbar .grow{flex:1}
+.banner{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 16px;padding:12px 16px;border-radius:12px;background:var(--amber-soft);color:var(--ink);font-size:14px}
+.banner.red{background:var(--red-soft)}
+.rowopen{cursor:pointer}
+.pill{display:inline-block;font-size:12px;color:var(--ink-2);background:var(--fill-2);padding:2px 9px;border-radius:980px;white-space:nowrap}
+.pend-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--amber);margin-left:6px;vertical-align:middle}
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:20;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.show{opacity:1;pointer-events:auto}
+.sheet{position:fixed;top:0;right:0;bottom:0;width:min(520px,100%);background:var(--surface);z-index:21;transform:translateX(100%);transition:transform .25s ease;overflow-y:auto;box-shadow:-10px 0 40px rgba(0,0,0,.12);padding:calc(env(safe-area-inset-top,0px) + 20px) 24px calc(env(safe-area-inset-bottom,0px) + 32px)}
+.sheet.show{transform:none}
+.sheet h2{font-size:24px;letter-spacing:-.022em;margin:0 0 4px;font-weight:700}
+.sheet h3{font-size:13px;font-weight:600;color:var(--muted);margin:26px 0 10px}
+.sheet .close{position:sticky;top:0;float:right;background:var(--fill-2);color:var(--ink-2);width:30px;height:30px;padding:0;border-radius:50%;font-size:16px;line-height:30px;text-align:center}
+.kv{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;margin-top:10px}
+.dispo{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.dispo button{background:var(--fill-2);color:var(--ink);border-radius:12px;padding:12px 10px;font-size:14px;font-weight:500;text-align:left}
+.dispo button:hover{background:var(--fill)}
+.dispo button.good{color:var(--green)} .dispo button.bad{color:var(--red)}
+.field{margin-top:12px}
+.sheet textarea{width:100%;min-height:76px;padding:10px 12px;font-size:14px;line-height:1.45;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hist{list-style:none;margin:0;padding:0}
+.hist li{padding:12px 0;border-bottom:1px solid var(--hair);font-size:14px}
+.hist li:last-child{border-bottom:0}
+.hist .meta{font-size:12px;color:var(--faint);margin-top:2px}
+.conf{padding:12px 14px;border-radius:12px;background:var(--amber-soft);margin-top:10px;font-size:13.5px}
+.conf .vs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
+.conf .vs div{background:var(--surface);border-radius:8px;padding:8px 10px;white-space:pre-wrap;word-break:break-word}
+.conf .vs b{display:block;font-size:11px;color:var(--muted);font-weight:600;margin-bottom:2px}
+/* modal */
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-48%);opacity:0;pointer-events:none;width:min(560px,calc(100% - 32px));max-height:calc(100% - 48px);overflow-y:auto;background:var(--surface);border-radius:20px;z-index:22;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.2);transition:opacity .18s,transform .18s}
+.modal.show{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+.modal h2{font-size:22px;margin:0 0 4px;letter-spacing:-.02em}
+.modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:560px){.grid2,.row2{grid-template-columns:1fr}}
+/* dashboard */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 20px}
+.kpi{background:var(--surface);border-radius:18px;box-shadow:var(--shadow);padding:18px 20px}
+.kpi b{display:block;font-size:30px;font-weight:600;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.kpi span{font-size:13px;color:var(--muted)}
+.num{font-variant-numeric:tabular-nums;text-align:right}
+th.num{text-align:right}
+/* ---------- sign-in gate ---------- */
+.gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+.gate-card{max-width:400px;width:100%;text-align:center}
+.gate-card .mark{width:64px;height:64px;border-radius:16px;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:28px;margin:0 auto 22px;letter-spacing:-.03em}
+.gate-card h1{font-size:32px;margin:0 0 8px}
+.gate-card p{color:var(--muted);font-size:16px;margin:0 0 24px}
+.gate-card .primary{width:100%;padding:13px 20px;font-size:16px}
+.gate-card .small-note{font-size:13px;color:var(--faint);margin-top:18px}
+.userchip{font-size:12px;color:var(--muted);background:none;padding:4px 6px}
+.userchip:hover{color:var(--blue)}
+@media (max-width:640px){.nav-in{flex-wrap:wrap}.wrap{padding-top:36px}}
+</style>
+</head>
+<body>
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <div class="mark">S</div>
+    <h1 id="gateTitle">Strata Marquee CRM</h1>
+    <p id="gateText">Sign in with your Google account to open your leads.</p>
+    <button class="primary" id="signInBtn">Sign in with Google</button>
+    <button class="ghost hidden" id="gateSignOut" style="margin-top:10px;width:100%">Use a different account</button>
+    <div id="gateMsg"></div>
+    <p class="small-note" id="gateNote">Works offline after your first sign-in.</p>
+  </div>
+</div>
+<header class="nav">
+  <div class="nav-in">
+    <div class="brand">Strata Marquee <span>Leads</span></div>
+    <div class="seg" role="tablist" aria-label="Section">
+      <button id="tFind" class="hidden" role="tab">Find</button>
+      <button id="tPipe" role="tab">Pipeline<span class="count" id="pipeCount">0</span></button>
+      <button id="tDash" role="tab">Dashboard</button>
+    </div>
+    <div class="navright">
+      <button class="sync off" id="syncPill" title="Sync status"><i></i><span id="syncText">Starting…</span></button>
+      <button class="userchip" id="signOutBtn" title="Sign out">Sign out</button>
+      <div class="seg small" role="group" aria-label="Appearance">
+        <button id="thAuto">Auto</button><button id="thLight">Light</button><button id="thDark">Dark</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <p class="eyebrow" id="eyebrow">AI receptionist</p>
+    <h1 id="title"></h1>
+    <p class="sub" id="sub"></p>
+  </div>
+
+  <!-- Find -->
+  <section id="findView">
+    <div class="modes">
+      <div class="seg" role="tablist" aria-label="Offer">
+        <button id="mRecep" class="on" role="tab">AI receptionist</button>
+        <button id="mWeb" role="tab">Websites</button>
+      </div>
+    </div>
+    <div class="card search">
+      <div><label for="kind">Business type</label><input id="kind" value="plumber" autocomplete="off"></div>
+      <div><label for="city">Location</label><input id="city" value="San Antonio TX" autocomplete="off"></div>
+      <div><label for="pages">Results</label>
+        <select id="pages"><option value="1">20</option><option value="2" selected>40</option><option value="3">60</option></select></div>
+      <div class="go"><button class="primary" id="findBtn">Search</button></div>
+      <div class="extra" id="extraRow">
+        <div><label for="demoLine">Demo line</label><input id="demoLine" placeholder="Optional" autocomplete="off"></div>
+        <div style="align-self:center" class="note">Add the number Sam answers, and every draft invites prospects to call after 5 p.m. to hear it for themselves.</div>
+      </div>
+    </div>
+    <div class="quick" id="quick"></div>
+    <p class="note tipline" id="tip"></p>
+    <div id="status"></div>
+
+    <div class="bar hidden" id="bar">
+      <div class="stats" id="stats"></div>
+      <div class="tools">
+        <label class="check"><input type="checkbox" id="showAll"> <span id="showAllLabel">Show low fits</span></label>
+        <button class="primary small" id="saveAllBtn">Save all to pipeline</button>
+      </div>
+    </div>
+    <div class="tablewrap hidden" id="tableWrap">
+      <table>
+        <thead><tr><th>Business</th><th>Fit</th><th>Why</th><th>Phone</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Pipeline / CRM -->
+  <section id="pipeView" class="hidden">
+    <div id="pStatus"></div>
+    <div id="confBanner"></div>
+    <div class="stages" id="stages"></div>
+    <div class="toolbar">
+      <input id="pSearch" placeholder="Search" autocomplete="off" style="max-width:260px">
+      <select id="pMode" style="width:auto;min-width:150px"><option value="">All offers</option><option value="recep">AI receptionist</option><option value="web">Websites</option></select>
+      <select id="pCamp" style="width:auto;min-width:170px"><option value="">All campaigns</option></select>
+      <div class="seg" id="ownerSeg"><button id="oAll" class="on">Everyone</button><button id="oMine">Mine</button><button id="oNone">Unassigned</button></div>
+      <label class="check" for="callVia" style="gap:6px">Calls open in
+        <select id="callVia" style="width:auto;min-width:150px;height:34px;padding:6px 28px 6px 10px;font-size:13.5px;background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px"><option value="tel">Phone app</option><option value="gv">Google Voice</option></select>
+      </label>
+      <span class="grow"></span>
+      <span id="bulkWrap" class="hidden" style="display:inline-flex;gap:6px;align-items:center">
+        <select id="bulkTo" style="width:auto;min-width:190px;height:34px;padding:6px 28px 6px 10px;font-size:13.5px;background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px"></select>
+        <button class="primary small" id="bulkGo">Assign</button>
+      </span>
+      <button class="ghost small" id="newLeadBtn">New lead</button>
+      <button class="ghost small" id="importBtn">Import CSV</button>
+      <button class="ghost small" id="pCsvBtn">Export CSV</button>
+      <input type="file" id="importFile" accept=".csv,text/csv" class="hidden">
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Business</th><th>Stage</th><th>Follow up</th><th>Owner</th><th>Last call</th><th></th></tr></thead>
+        <tbody id="pRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Dashboard -->
+  <section id="dashView" class="hidden">
+    <div class="toolbar">
+      <div class="seg" id="periodSeg"><button data-p="1" class="on">Today</button><button data-p="7">7 days</button><button data-p="30">30 days</button><button data-p="0">All time</button></div>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Rep</th><th class="num">Calls</th><th class="num">Conversations</th><th class="num">Demos booked</th><th class="num">Book rate</th><th class="num">Open leads</th><th class="num">Due</th><th class="num">Overdue</th><th class="num">Won</th></tr></thead>
+        <tbody id="dRows"></tbody>
+      </table>
+    </div>
+    <div id="adminBox" class="hidden">
+      <h2 style="font-size:22px;letter-spacing:-.02em;margin:40px 2px 6px">Access requests</h2>
+      <p class="note" style="margin:0 2px 14px">People who signed in and are waiting for you. Approve your reps; deny anyone you don’t know.</p>
+      <div class="tablewrap"><table style="min-width:520px"><thead><tr><th>Name</th><th>Email</th><th>Asked</th><th></th></tr></thead><tbody id="accessRows"></tbody></table></div>
+      <h2 style="font-size:22px;letter-spacing:-.02em;margin:40px 2px 6px">Move data from the Claude version</h2>
+      <p class="note" style="margin:0 2px 14px">One time only: choose the strata-crm-backup.json file. Leads, call history, assignments and the team come over; anything already here is left as is.</p>
+      <div class="toolbar"><button class="ghost small" id="restoreBtn">Import backup file</button><input type="file" id="restoreFile" accept=".json,application/json" class="hidden"></div>
+      <div id="restoreMsg"></div>
+    </div>
+    <h2 style="font-size:22px;letter-spacing:-.02em;margin:40px 2px 6px">Team</h2>
+    <p class="note" style="margin:0 2px 14px">Reps you can assign leads to. Link each one to their account after they open this page once, so their calls count under their name.</p>
+    <div id="teamMsg"></div>
+    <div class="tablewrap">
+      <table style="min-width:560px">
+        <thead><tr><th>Rep</th><th>Linked account</th><th class="num">Assigned</th><th></th></tr></thead>
+        <tbody id="teamRows"></tbody>
+      </table>
+    </div>
+    <div class="toolbar" id="teamAdd" style="margin-top:12px">
+      <input id="newRep" placeholder="Add a rep by name" autocomplete="off" style="max-width:260px">
+      <button class="ghost small" id="addRepBtn">Add rep</button>
+    </div>
+  </section>
+
+  <p class="foot">Every change saves on this device first and syncs to your shared pipeline when you’re online; if two people change the same field, you choose which to keep. Exports open in Excel or Google Sheets and work with call_leads.py.</p>
+</main>
+
+<!-- lead sheet -->
+<div class="scrim" id="scrim"></div>
+<aside class="sheet" id="sheet" aria-label="Lead details"></aside>
+
+<!-- new lead modal -->
+<div class="modal" id="newModal" role="dialog" aria-label="New lead">
+  <h2>New lead</h2>
+  <p class="note">Saved on this device right away, synced when you’re online.</p>
+  <div class="grid2" style="margin-top:16px">
+    <div><label for="nlName">Business name</label><input id="nlName" autocomplete="off"></div>
+    <div><label for="nlPhone">Phone</label><input id="nlPhone" autocomplete="off" inputmode="tel"></div>
+    <div><label for="nlCat">Business type</label><input id="nlCat" autocomplete="off"></div>
+    <div><label for="nlCity">City, state</label><input id="nlCity" autocomplete="off"></div>
+    <div><label for="nlEmail">Contact email</label><input id="nlEmail" autocomplete="off" inputmode="email"></div>
+    <div><label for="nlOffer">Offer</label><select id="nlOffer"><option value="recep">AI receptionist</option><option value="web">Websites</option></select></div>
+  </div>
+  <div class="field"><label for="nlNotes">Notes</label><textarea id="nlNotes" style="width:100%;min-height:70px;padding:10px 12px"></textarea></div>
+  <div id="nlMsg"></div>
+  <div class="actions"><button class="ghost" id="nlCancel">Cancel</button><button class="primary" id="nlSave">Add lead</button></div>
+</div>
+
+<!-- import modal -->
+<div class="modal" id="impModal" role="dialog" aria-label="Import CSV">
+  <h2>Import leads</h2>
+  <p class="note" id="impSummary"></p>
+  <div id="impMsg"></div>
+  <div class="actions"><button class="ghost" id="impCancel">Cancel</button><button class="primary" id="impGo">Import</button></div>
+</div>
+<script type="text/plain" id="crm-code">
+(() => {
+  const $ = id => document.getElementById(id);
+  const WEAK = /godaddysites\.com|wixsite\.com|business\.site|facebook\.com|fb\.me|instagram\.com|linktr\.ee|sites\.google\.com|weebly|square\.site|yelp\.com|nextdoor|carrd\.co|mystrikingly|webnode|jimdo|site123|homestars|angi\.com|thumbtack/i;
+  const URGENT = /plumb|hvac|air condition|heating|furnace|electric|roof|locksmith|tow|wrecker|restoration|water damage|fire damage|mold|property manag|apartment|garage door|pest|septic|sewer|drain|glass|boiler|generator|tree service|emergency|personal injury|criminal|dui|bail bond|immigration|accident/i;
+  const AFTER_WORK = /law|attorney|lawyer|dentist|dental|orthodont|veterin|animal hospital|clinic|chiropract|physical therap|urgent care|auto repair|mechanic|collision|body shop|tire|cleaning|janitor|security|moving|mover|storage|insurance|real estate|contractor|remodel|landscap|pool/i;
+  const FRANCHISE = /roto-?rooter|mr\.? ?(handyman|rooter|electric|appliance|sparky)|ace handyman|one hour heating|benjamin franklin plumbing|servpro|servicemaster|aire serv|molly maid|merry maids|two men and a truck|jiffy lube|midas|meineke|firestone|pep boys|aspen dental|western dental|bright now|banfield|vca |terminix|orkin|christian brothers|valvoline|take 5|safelite|budget blinds|paul davis|puroclean|pop-a-lock|aaa |enterprise rent|u-haul|public storage|extra space|cubesmart|state farm|allstate|farmers insurance|keller williams|re\/max|coldwell|century 21|great clips|monro|goodyear|precision tune|dentalworks|smile brands|comfort dental|marquis|sears/i;
+  const CHAIN_PATH = /\/(offices|locations?|branches|areas?|stores?)\//i;
+  const BOOK = "https://tidycal.com/stratamarqueegroup/15-minute-meeting-with-christopher-granados";
+
+
+  const STAGES = [
+    ["new","New"],["contacted","Contacted"],["replied","Replied"],["demo","Demo booked"],
+    ["won","Won"],["lost","Lost"],["dnc","Do not contact"]
+  ];
+  const STAGE_NAME = Object.fromEntries(STAGES);
+  const CLOSED = ["won","lost","dnc"];
+  // what call_leads.py reads in outreach_status
+  const CALL_STATUS = { new:"new", contacted:"called", replied:"new", demo:"booked", won:"booked", lost:"not_interested", dnc:"do_not_call" };
+  // one-click dispositions: [key, label, tone, stage rule, follow-up days (null = clear, "pick" = use the date field)]
+  const DISPO = [
+    ["no_answer","No answer","",       s => s === "new" ? "contacted" : s, 1],
+    ["voicemail","Left voicemail","",  s => s === "new" ? "contacted" : s, 2],
+    ["callback","Call back","",        s => ["new","contacted"].includes(s) ? "replied" : s, "pick"],
+    ["interested","Interested","good", () => "replied", 2],
+    ["demo","Demo booked","good",      () => "demo", null],
+    ["not_interested","Not interested","bad", () => "lost", null],
+    ["wrong_number","Wrong number","bad", () => "lost", null],
+    ["dnc","Do not call","bad",        () => "dnc", null]
+  ];
+  const DISPO_NAME = Object.fromEntries(DISPO.map(d => [d[0], d[1]]));
+  DISPO_NAME.note = "Note";
+  const TALKED = ["callback","interested","demo","not_interested","dnc"];
+  // fields a sales rep edits; everything else on a lead comes from search/import
+  const SYNC_META = ["rev","updatedAt","updatedBy"];
+
+  const MODES = {
+    recep: {
+      eyebrow: 'AI receptionist',
+      title: 'Every missed call, <em>a missed job.</em>',
+      sub: 'Find the businesses losing calls after hours. Ranked by fit, ready to save and work.',
+      quick: [["plumber","San Antonio TX"],["property management","Houston TX"],["hvac","Fresno CA"],["towing","Dallas TX"],["personal injury lawyer","El Paso TX"],["dentist","Bakersfield CA"],["roofing","Austin TX"],["auto repair","Sacramento CA"]],
+      tip: 'Best fits are emergency trades, property managers, law firms and clinics. Every 20 results uses 10 Firecrawl credits.',
+      kind: "plumber", city: "San Antonio TX", showAll: "Show low fits"
+    },
+    web: {
+      eyebrow: 'Websites',
+      title: 'Great businesses. <em>No website.</em>',
+      sub: 'Find local businesses without a real site, and reach them first.',
+      quick: [["handyman","San Antonio TX"],["house cleaning","Laredo TX"],["landscaping","Fresno CA"],["food truck","El Paso TX"],["barber shop","Bakersfield CA"],["auto repair","McAllen TX"]],
+      tip: 'Small trades in smaller towns turn up the most. Every 20 results uses 10 Firecrawl credits.',
+      kind: "handyman", city: "San Antonio TX", showAll: "Show businesses with sites"
+    }
+  };
+
+
+  let mode = "recep", view = "find";
+  let mcp = null, sample = null, downloads = null, rdb = null, user = null;
+  let myId = null, isAdmin = false, readOnly = false;
+  let leads = [], busy = false, lastQuery = "";
+  let stageFilter = "", ownerFilter = "all", names = {}, period = 1, openId = null;
+  const TAB = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
+
+  // ================= helpers =================
+  const uuid = () => crypto.randomUUID ? crypto.randomUUID() : "x" + Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const nowIso = () => new Date().toISOString();
+  function today(){ return dayStr(new Date()); }
+  function dayStr(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+  function plusDays(n){ const d = new Date(); d.setDate(d.getDate() + n); return dayStr(d); }
+  const eq = (a, b) => JSON.stringify(a ?? "") === JSON.stringify(b ?? "");
+  function e164(raw){ const s = String(raw || ""), d = s.replace(/\D/g, ""); if (/^\s*\+/.test(s) && d.length >= 8 && d.length <= 15) return "+" + d; return d.length === 10 ? "+1" + d : d.length === 11 && d[0] === "1" ? "+" + d : ""; }
+  function normName(s){ return String(s || "").toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim(); }
+  function fnv(str){ let h = 0x811c9dc5; for (let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); }
+  function host(u){ try { return new URL(u).hostname.replace(/^www\./,""); } catch { return u; } }
+  function cityOf(r){ const l = r.address_lines || []; return l.length ? l[l.length-1] : ""; }
+  function gmaps(r){ return r.place_id ? "https://www.google.com/maps/place/?q=place_id:" + encodeURIComponent(r.place_id) : null; }
+  function fmtN(n){ return Number(n).toLocaleString("en-US"); }
+  function leadId(r){ return String(r.place_id || r.feature_id || (r.name + "-" + (r.phone_e164||""))).replace(/[^A-Za-z0-9_\-.~:@+]/g, "_").slice(0, 180); }
+  function safeId(s){ return String(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, "_").slice(0, 180); }
+  function when(iso){ if (!iso) return ""; const d = new Date(iso); const t = today(); const ds = dayStr(d);
+    const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return ds === t ? "Today " + time : ds === plusDays(-1) ? "Yesterday " + time : d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + time; }
+  function withTimeout(p, ms){ return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: "timeout" }), ms))]); }
+  function strip(row){ const o = {}; for (const k in row) if (k[0] !== "_") o[k] = row[k]; return o; }
+  function msg(el, text, err){ el.innerHTML = ""; if (!text) return; const d = document.createElement("div"); d.className = "msg" + (err ? " err" : ""); d.textContent = text; el.appendChild(d); }
+  const status = (t, e) => msg($("status"), t, e);
+  const pStatus = (t, e) => msg($("pStatus"), t, e);
+  let renderTimer = null;
+  function scheduleRender(){ clearTimeout(renderTimer); renderTimer = setTimeout(renderAll, 30); }
+
+  function errorText(e){
+    switch (e?.code){
+      case "server_not_connected": return "Firecrawl isn’t connected for you. Add it in claude.ai Settings → Connectors, then try again.";
+      case "needs_reauth": return "Your Firecrawl connection expired. Reconnect it in claude.ai Settings → Connectors.";
+      case "selection_required": return "You have more than one Firecrawl connector. Pick one when claude.ai asks, then search again.";
+      case "not_in_manifest": case "approval_required": return "This page needs your OK to use Firecrawl. Tap Find leads again and choose Allow.";
+      case "blocked_by_policy": return "Your organization blocks this Firecrawl tool.";
+      case "server_unavailable": case "rate_limited": return "Firecrawl didn’t answer in time. Wait a few seconds and try again.";
+      case "tool_error": return "Firecrawl couldn’t run that search: " + (e.message || "unknown error").slice(0, 200);
+      default: return "The search failed (" + (e?.code || "error") + "). Try again in a moment.";
+    }
+  }
+  function extract(payload){
+    let p = payload;
+    if (typeof p === "string"){ try { p = JSON.parse(p); } catch { return {results:[], next:null}; } }
+    const block = p?.data?.alexandria?.[0] ?? p?.alexandria?.[0] ?? p;
+    if (block?.error) throw {code:"tool_error", message: block.error.message || JSON.stringify(block.error)};
+    const d = block?.data ?? block;
+    return { results: Array.isArray(d?.results) ? d.results : [], next: d?.has_more ? d?.next_cursor : null };
+  }
+
+  function extract(payload){
+    let p = payload;
+    if (typeof p === "string"){ try { p = JSON.parse(p); } catch { return {results:[], next:null}; } }
+    const block = p?.data?.alexandria?.[0] ?? p?.alexandria?.[0] ?? p;
+    if (block?.error) throw {code:"tool_error", message: block.error.message || JSON.stringify(block.error)};
+    const d = block?.data ?? block;
+    return { results: Array.isArray(d?.results) ? d.results : [], next: d?.has_more ? d?.next_cursor : null };
+  }
+
+  // ================= local store (IndexedDB via Dexie) =================
+  // leads:     one row per lead, the same id as the shared "leads" document. _base = last copy seen from the server.
+  // calls:     call log, same id as the shared "calls" document.
+  // assign:    lead id -> assigned rep, same id as the shared "assign" document.
+  // outbox:    changes made on this device that haven't reached the server yet, in order.
+  // conflicts: fields someone else changed while this device was offline.
+  const ldb = new Dexie("strata-crm");
+  ldb.version(1).stores({
+    leads: "id, stage, followUp, updatedAt",
+    calls: "id, leadId, at, by",
+    assign: "id",
+    members: "id",
+    outbox: "++seq, docId, kind",
+    conflicts: "++cid, leadId",
+    meta: "k"
+  });
+  // in-memory mirrors for rendering
+  let L = new Map(), C = new Map(), A = new Map(), M = new Set(), OUT = [], CONF = [], R = new Map();
+  async function loadLocal(){
+    const [ls, cs, as, ms, ob, cf] = await Promise.all([ldb.leads.toArray(), ldb.calls.toArray(), ldb.assign.toArray(), ldb.members.toArray(), ldb.outbox.orderBy("seq").toArray(), ldb.conflicts.toArray()]);
+    L = new Map(ls.map(r => [r.id, r])); C = new Map(cs.map(r => [r.id, r])); A = new Map(as.map(r => [r.id, r]));
+    M = new Set(ms.map(r => r.id)); OUT = ob; CONF = cf;
+    try { const rr = await ldb.meta.get("roster"); R = new Map((rr?.v || []).map(x => [x.id, x])); } catch {}
+    scheduleRender(); resolveNames();
+  }
+  const pendingIds = () => new Set(OUT.map(o => o.docId));
+  function pendingFields(id){ const f = {}; for (const o of OUT) if (o.docId === id && o.kind === "lead.patch") Object.assign(f, o.fields); return f; }
+  function hasPendingCreate(id){ return OUT.some(o => o.docId === id && o.kind === "lead.create"); }
+
+  // ================= mutations (the only way anything changes) =================
+  async function createLead(id, body){
+    body = { ...body, rev: 0, updatedAt: nowIso(), updatedBy: myId || null };
+    await ldb.transaction("rw", ldb.leads, ldb.outbox, async () => {
+      await ldb.leads.put({ ...body, id, _base: null });
+      await ldb.outbox.add({ kind: "lead.create", docId: id, body, createdAt: nowIso() });
+    });
+    await loadLocal(); kick();
+  }
+  async function patchLead(id, fields){
+    const row = L.get(id); if (!row) return;
+    fields = { ...fields };
+    await ldb.transaction("rw", ldb.leads, ldb.outbox, async () => {
+      const cur = await ldb.leads.get(id); if (!cur) return;
+      await ldb.leads.put({ ...cur, ...fields, updatedAt: nowIso(), updatedBy: myId || null });
+      const q = await ldb.outbox.where("docId").equals(id).toArray();
+      // a lead created on this device and not yet sent: fold the edit into the create itself
+      const create = q.find(o => o.kind === "lead.create" && o.seq !== inflight);
+      if (create){ await ldb.outbox.update(create.seq, { body: { ...create.body, ...fields, updatedAt: nowIso() } }); return; }
+      // fold into the last queued patch for this lead unless it is being sent right now
+      const last = q.filter(o => o.kind === "lead.patch" && o.seq !== inflight).pop();
+      if (last && q[q.length - 1].seq === last.seq){
+        const base = { ...last.base };
+        for (const k in fields) if (!(k in base)) base[k] = cur._base ? cur._base[k] ?? "" : "";
+        await ldb.outbox.update(last.seq, { fields: { ...last.fields, ...fields }, base });
+      } else {
+        const base = {}; for (const k in fields) base[k] = cur._base ? cur._base[k] ?? "" : "";
+        await ldb.outbox.add({ kind: "lead.patch", docId: id, fields, base, createdAt: nowIso() });
+      }
+    });
+    await loadLocal(); kick();
+  }
+  async function deleteLead(id){
+    await ldb.transaction("rw", ldb.leads, ldb.outbox, async () => {
+      await ldb.leads.delete(id);
+      const q = await ldb.outbox.where("docId").equals(id).toArray();
+      const created = q.some(o => o.kind === "lead.create");
+      for (const o of q) if (o.seq !== inflight) await ldb.outbox.delete(o.seq);
+      if (!created) await ldb.outbox.add({ kind: "lead.delete", docId: id, createdAt: nowIso() });
+    });
+    await loadLocal(); kick();
+  }
+  async function logCall(leadId, disposition, note, followPick){
+    const lead = L.get(leadId); if (!lead) return;
+    const id = "c_" + uuid();
+    const at = nowIso();
+    const call = { leadId, by: myId || null, at, disposition, note: (note || "").slice(0, 4000), leadName: lead.name || "" };
+    await ldb.transaction("rw", ldb.calls, ldb.outbox, async () => {
+      await ldb.calls.put({ ...call, id, _synced: false });
+      await ldb.outbox.add({ kind: "call.create", docId: id, body: call, createdAt: at });
+    });
+    if (disposition !== "note"){
+      const d = DISPO.find(x => x[0] === disposition);
+      const fields = { stage: d[3](lead.stage || "new"), lastDisposition: disposition, lastCallAt: at, lastCallBy: myId || null };
+      fields.followUp = d[4] === null ? "" : d[4] === "pick" ? (followPick || plusDays(1)) : plusDays(d[4]);
+      await patchLead(leadId, fields);
+    } else { await loadLocal(); kick(); }
+  }
+  // assign many leads in one go (one local transaction, then one sync pass)
+  async function assignMany(pairs){
+    const at = nowIso();
+    await ldb.transaction("rw", ldb.assign, ldb.outbox, async () => {
+      for (const [leadId, to] of pairs){
+        const body = { to: to || "", by: myId || null, at };
+        const prev = await ldb.assign.get(leadId);
+        await ldb.assign.put({ ...body, id: leadId, _synced: false, _prev: prev ? (prev._prev !== undefined && !prev._synced ? prev._prev : strip(prev)) : null });
+        await ldb.outbox.add({ kind: "assign.set", docId: leadId, body, createdAt: at });
+      }
+    });
+    await loadLocal(); kick();
+  }
+  async function assignLead(leadId, to){
+    const body = { to: to || "", by: myId || null, at: nowIso() };
+    await ldb.transaction("rw", ldb.assign, ldb.outbox, async () => {
+      const prev = await ldb.assign.get(leadId);
+      await ldb.assign.put({ ...body, id: leadId, _synced: false, _prev: prev ? (prev._prev !== undefined && !prev._synced ? prev._prev : strip(prev)) : null });
+      await ldb.outbox.add({ kind: "assign.set", docId: leadId, body, createdAt: body.at });
+    });
+    await loadLocal(); kick();
+  }
+
+  // ================= sync engine =================
+  let busyTimer = null, inflight = null, flushing = false, online = navigator.onLine, lastOk = 0, lastErr = "", remoteReady = { leads: false, calls: false, assign: false };
+  const WRITE_MS = 15000;
+  function kick(){ updatePill(); if (online) setTimeout(flush, 0); }
+  window.addEventListener("online", () => { online = true; updatePill(); flush(); });
+  window.addEventListener("offline", () => { online = false; updatePill(); });
+  setInterval(() => { if (OUT.length && navigator.onLine) { online = true; flush(); } }, 15000);
+
+  async function flush(){
+    if (!rdb || flushing || !OUT.length) { updatePill(); return; }
+    const run = async () => {
+      flushing = true; updatePill(); let done = 0;
+      try {
+        while (true){
+          const op = await ldb.outbox.orderBy("seq").first();
+          if (!op) break;
+          inflight = op.seq;
+          const res = await pushOp(op);         // "done" | "retry" | "drop"
+          inflight = null;
+          if (res === "retry") break;
+          await ldb.outbox.delete(op.seq);
+          // keep the in-memory view current cheaply; reload everything only every 25 changes
+          OUT = OUT.filter(o => o.seq !== op.seq); done++;
+          if (op.kind === "call.create" || op.kind === "assign.set"){ const m = op.kind === "call.create" ? C : A; const r = m.get(op.docId); if (r) r._synced = true; }
+          updatePill();
+          if (done % 25 === 0) await loadLocal();
+        }
+      } finally { inflight = null; flushing = false; await loadLocal(); updatePill(); }
+    };
+    if (navigator.locks?.request) await navigator.locks.request("strata-crm-sync", { ifAvailable: true }, async lock => { if (lock) await run(); });
+    else await run();
+  }
+
+  function transient(e){ return !e || ["timeout","unavailable","resource_exhausted","capability_disabled","capability_removed"].includes(e.code); }
+  async function guard(fn){
+    try { const r = await withTimeout(fn(), WRITE_MS); online = true; lastOk = Date.now(); lastErr = ""; return { ok: true, r }; }
+    catch(e){
+      if (transient(e)){ if (e?.code === "timeout" || e?.code === "unavailable") online = false; lastErr = e?.code || "error"; return { ok: false, retry: true, e }; }
+      return { ok: false, retry: false, e };
+    }
+  }
+
+  async function pushOp(op){
+    const coll = op.kind.startsWith("lead") ? "leads" : op.kind.startsWith("call") ? "calls" : "assign";
+    const ref = rdb.collection(coll).doc(op.docId);
+
+    if (op.kind === "call.create" || op.kind === "assign.set"){
+      const w = await guard(() => ref.set(op.body));            // same id every retry, so a repeat is harmless
+      if (w.ok){ await (coll === "calls" ? ldb.calls : ldb.assign).update(op.docId, { _synced: true }); return "done"; }
+      if (w.retry) return "retry";
+      await rejected(op, w.e); return "drop";
+    }
+
+    if (op.kind === "lead.delete"){
+      const w = await guard(() => ref.delete());
+      if (w.ok) return "done"; if (w.retry) return "retry"; await rejected(op, w.e); return "drop";
+    }
+
+    // creates and patches: take a short lease so two devices never interleave a read and a write
+    let leased = true;
+    if (op.kind === "lead.patch"){
+      const lk = await guard(() => ref.acquire({ holder: TAB, ttlMs: 4000 }));
+      if (!lk.ok){ if (lk.retry) return "retry"; leased = false; }
+      else if (!lk.r?.acquired){
+        // another device is writing this lead right now: try again just after its lease ends
+        const wait = Math.max(300, Math.min(5000, (Date.parse(lk.r?.expiresAt || "") || Date.now() + 1000) - Date.now() + 250));
+        clearTimeout(busyTimer); busyTimer = setTimeout(flush, wait);
+        return "retry";
+      }
+    }
+    const g = await guard(() => ref.get());
+    if (!g.ok) return g.retry ? "retry" : (await rejected(op, g.e), "drop");
+    const remote = g.r.exists ? g.r.data() : null;
+    const real = remote && remote.name !== undefined;   // ignore a bare lease record
+
+    if (op.kind === "lead.create"){
+      if (!real){
+        const w = await guard(() => ref.set({ ...op.body, rev: 1 }));
+        if (w.ok){ await settle(op.docId, { ...op.body, rev: 1 }); return "done"; }
+        return w.retry ? "retry" : (await rejected(op, w.e), "drop");
+      }
+      // the lead already exists (same business saved elsewhere): merge into it, never duplicate.
+      // Only fill what the server copy is missing; its stage, notes and follow-ups stay as they are.
+      const fill = {};
+      for (const k in op.body){ if (SYNC_META.includes(k) || ["addedAt","addedBy"].includes(k)) continue; if (remote[k] === undefined || remote[k] === "" || remote[k] === null) if (!eq(op.body[k], "")) fill[k] = op.body[k]; }
+      if (!Object.keys(fill).length){ await settle(op.docId, remote); return "done"; }
+      const body = { ...fill, rev: (remote.rev || 0) + 1, updatedAt: nowIso(), updatedBy: myId || null };
+      const w = await guard(() => ref.update(body));
+      if (!w.ok) return w.retry ? "retry" : (await rejected(op, w.e), "drop");
+      await settle(op.docId, { ...remote, ...body }); return "done";
+    }
+    // lead.patch
+    if (!real){
+      await ldb.conflicts.add({ leadId: op.docId, field: "_deleted", mine: op.fields, theirs: null, at: nowIso(), name: (L.get(op.docId) || {}).name || "" });
+      return "drop";
+    }
+    return await applyPatch(ref, op, remote, op.fields, op.base, leased);
+  }
+
+  // three-way merge per field: base = value this device last saw, mine = local edit, theirs = server now
+  async function applyPatch(ref, op, remote, fields, base, leased){
+    const apply = {}; const clash = [];
+    for (const k in fields){
+      const mine = fields[k], theirs = remote[k], was = base[k];
+      if (eq(theirs, mine)) continue;                         // already the same
+      if (eq(theirs, was) || theirs === undefined) apply[k] = mine;  // nobody else touched it
+      else if (k === "lastDisposition" || k === "lastCallAt" || k === "lastCallBy"){ if (String(fields.lastCallAt || "") > String(remote.lastCallAt || "")) apply[k] = mine; }  // newest call wins
+      else clash.push({ field: k, mine, theirs, base: was });
+    }
+    for (const c of clash) await ldb.conflicts.add({ leadId: op.docId, field: c.field, mine: c.mine, theirs: c.theirs, base: c.base, at: nowIso(), name: remote.name || "" });
+    if (Object.keys(apply).length){
+      const body = { ...apply, rev: (remote.rev || 0) + 1, updatedAt: nowIso(), updatedBy: myId || null };
+      const w = await guard(() => ref.update(body));
+      if (!w.ok) return w.retry ? "retry" : (await rejected(op, w.e), "drop");
+      await settle(op.docId, { ...remote, ...body });
+    } else await settle(op.docId, remote);
+    return "done";
+  }
+  // after a successful write: remember the server copy and rebuild what this device shows
+  async function settle(id, serverBody){
+    const row = await ldb.leads.get(id);
+    const later = (await ldb.outbox.where("docId").equals(id).toArray()).filter(o => o.seq !== inflight && o.kind === "lead.patch");
+    const pend = Object.assign({}, ...later.map(o => o.fields));
+    const clashes = (await ldb.conflicts.where("leadId").equals(id).toArray()).map(c => c.field);
+    const shown = { ...serverBody, ...pend };
+    // a field in conflict keeps showing this device's value until the rep decides
+    if (row) for (const f of clashes) if (f in row) shown[f] = row[f];
+    await ldb.leads.put({ ...shown, id, _base: serverBody });
+  }
+  async function rejected(op, e){
+    if (e?.code === "invalid_argument"){
+      const nm = (L.get(op.leadId || op.docId) || {}).name || "a lead";
+      lastErr = op.kind === "assign.set" ? "Only an admin can assign leads."
+        : op.kind === "lead.create" ? "Only an admin can add leads."
+        : op.kind === "lead.delete" ? "Only an admin can remove leads."
+        : op.kind === "call.create" ? "A call couldn’t be saved: that lead may have been reassigned."
+        : `A change to ${nm} was refused: it may have been reassigned, or you don’t have permission for that field.`;
+    } else if (e?.code === "quota_exceeded") lastErr = "The shared pipeline is full. Delete old leads to make room.";
+    else lastErr = "A change couldn’t be saved (" + (e?.code || "error") + ").";
+    pStatus(lastErr, true);
+    // put the local copy back to the server's version
+    if (op.kind.startsWith("lead")){ const row = await ldb.leads.get(op.docId); if (row?._base) await ldb.leads.put({ ...row._base, id: op.docId, _base: row._base }); else if (op.kind === "lead.create") await ldb.leads.delete(op.docId); }
+    if (op.kind === "assign.set"){
+      const row = await ldb.assign.get(op.docId);
+      if (row && !row._synced){ if (row._prev) await ldb.assign.put({ ...row._prev, id: op.docId, _synced: true }); else await ldb.assign.delete(op.docId); }
+      await loadLocal();
+    }
+  }
+
+  // ================= server -> device =================
+  // many server updates in a burst (a bulk assign, an import) refresh the screen once, not hundreds of times
+  let loadTimer = null;
+  function loadSoon(){ clearTimeout(loadTimer); loadTimer = setTimeout(loadLocal, 150); }
+  function subscribe(){
+    if (!rdb) return;
+    const watchdog = setTimeout(() => { if (!remoteReady.leads){ online = false; updatePill(); } }, 10000);
+    rdb.collection("leads").onSnapshot(async snap => {
+      if (!snap.metadata.fromCache){ remoteReady.leads = true; clearTimeout(watchdog); online = true; lastOk = Date.now(); }
+      const pend = pendingIds();
+      const conf = new Set(CONF.map(c => c.leadId));
+      await ldb.transaction("rw", ldb.leads, async () => {
+        const seen = new Set();
+        for (const d of snap.docs){
+          if (!d.exists) continue; const body = d.data(); if (body.name === undefined) continue;
+          seen.add(d.id);
+          if (inflight !== null && OUT.find(o => o.seq === inflight)?.docId === d.id) continue;
+          const local = await ldb.leads.get(d.id);
+          // unchanged since this device last saw it and nothing pending: skip (keeps big pipelines fast)
+          if (local && !pend.has(d.id) && !conf.has(d.id) && eq(local._base, body)) continue;
+          let shown = { ...body };
+          if (pend.has(d.id)) Object.assign(shown, pendingFields(d.id));
+          if (local && conf.has(d.id)) for (const c of CONF) if (c.leadId === d.id && c.field in local) shown[c.field] = local[c.field];
+          await ldb.leads.put({ ...shown, id: d.id, _base: body });
+        }
+        if (!snap.metadata.fromCache){
+          const all = await ldb.leads.toArray();
+          for (const r of all) if (!seen.has(r.id) && !pend.has(r.id) && r._base) await ldb.leads.delete(r.id);  // deleted on the server
+        }
+      });
+      loadSoon(); if (OUT.length) flush();
+    }, e => { online = false; lastErr = e?.code || "error"; updatePill(); });
+
+    rdb.collection("calls").onSnapshot(async snap => {
+      if (!snap.metadata.fromCache) remoteReady.calls = true;
+      // the call log only grows: store just the calls this device doesn't have yet
+      const fresh = snap.docs.filter(d => d.exists && !C.get(d.id)?._synced).map(d => ({ ...d.data(), id: d.id, _synced: true }));
+      if (!fresh.length) return;
+      await ldb.calls.bulkPut(fresh);
+      loadSoon();
+    }, () => {});
+
+    rdb.collection("assign").onSnapshot(async snap => {
+      if (!snap.metadata.fromCache) remoteReady.assign = true;
+      const pend = pendingIds(); let changed = false;
+      await ldb.transaction("rw", ldb.assign, async () => {
+        const seen = new Set();
+        for (const d of snap.docs){
+          if (!d.exists) continue; seen.add(d.id);
+          if (pend.has(d.id)) continue;
+          const cur = A.get(d.id), body = d.data();
+          if (cur && cur._synced && cur.to === body.to && cur.at === body.at) continue;   // unchanged
+          await ldb.assign.put({ ...body, id: d.id, _synced: true }); changed = true;
+        }
+        if (!snap.metadata.fromCache) for (const r of A.values()) if (!seen.has(r.id) && r._synced){ await ldb.assign.delete(r.id); changed = true; }
+      });
+      if (changed) loadSoon();
+    }, () => {});
+
+    rdb.collection("members").onSnapshot(async snap => {
+      await ldb.members.bulkPut(snap.docs.filter(d => d.exists).map(d => ({ id: d.id })));
+      loadSoon();
+    }, () => {});
+
+    rdb.collection("roster").onSnapshot(async snap => {
+      if (snap.metadata.fromCache && !snap.docs.length) return;
+      await ldb.meta.put({ k: "roster", v: snap.docs.filter(d => d.exists).map(d => ({ ...d.data(), id: d.id })) });
+      loadSoon();
+    }, () => {});
+  }
+
+  async function registerMember(){
+    if (!rdb || !myId) return;
+    try {
+      const k = await ldb.meta.get("memberDay");
+      if (k?.v === today()) return;
+      await withTimeout(rdb.collection("members").doc(myId).set({ seenDay: today() }), WRITE_MS);
+      await ldb.meta.put({ k: "memberDay", v: today() });
+    } catch {}
+  }
+
+  // ================= conflicts =================
+  async function resolveConflict(cid, choice){
+    const c = CONF.find(x => x.cid === cid); if (!c) return;
+    const row = L.get(c.leadId);
+    if (c.field === "_deleted"){
+      if (choice === "restore" && row){ const body = strip(row); await ldb.conflicts.delete(cid); await createLead(c.leadId, body); }
+      else { await ldb.conflicts.delete(cid); await ldb.leads.delete(c.leadId); await loadLocal(); }
+      return;
+    }
+    await ldb.conflicts.delete(cid);
+    const server = row?._base || {};
+    if (choice === "theirs"){
+      if (row) await ldb.leads.put({ ...row, [c.field]: server[c.field] ?? c.theirs });
+      await loadLocal(); return;
+    }
+    let val = c.mine;
+    if (choice === "both") val = [server[c.field] ?? c.theirs, c.mine].filter(Boolean).join("\n\n");
+    // re-queue against the server's current value so it applies cleanly
+    await ldb.transaction("rw", ldb.leads, ldb.outbox, async () => {
+      const cur = await ldb.leads.get(c.leadId); if (!cur) return;
+      await ldb.leads.put({ ...cur, [c.field]: val });
+      await ldb.outbox.add({ kind: "lead.patch", docId: c.leadId, fields: { [c.field]: val }, base: { [c.field]: server[c.field] ?? c.theirs }, createdAt: nowIso() });
+    });
+    await loadLocal(); kick();
+  }
+
+  function updatePill(){
+    const p = $("syncPill"), t = $("syncText"); if (!p) return;
+    const n = OUT.length, k = CONF.length;
+    p.className = "sync";
+    if (k){ p.classList.add("warn"); t.textContent = k + (k === 1 ? " conflict" : " conflicts"); return; }
+    if (!rdb){ p.classList.add("off"); t.textContent = "This device only"; return; }
+    if (!online || !navigator.onLine){ p.classList.add("off"); t.textContent = n ? `Offline · ${n} to sync` : "Offline"; return; }
+    if (flushing){ p.classList.add("busy"); t.textContent = `Syncing ${n}…`; return; }
+    if (n){ p.classList.add("pend"); t.textContent = `${n} to sync`; return; }
+    t.textContent = "Synced";
+  }
+  $("syncPill").onclick = () => { if (CONF.length){ setView("pipe"); const first = CONF[0]; if (first && L.get(first.leadId)) openSheet(first.leadId); } else flush(); };
+
+  // ================= boot =================
+  (async () => {
+    const use = n => (window.claude?.use?.(n) ?? Promise.resolve(null)).catch(() => null);
+    try { await ldb.open(); } catch { pStatus("This browser blocked local storage, so offline mode is off for this visit.", true); }
+    await loadLocal();                                  // show what's on this device immediately, online or not
+    [mcp, sample, downloads, rdb, user] = await Promise.all([use("mcp"), use("sample"), use("downloads"), use("db"), use("user")]);
+    if (!mcp) { status("Lead search isn’t available in this version: it uses Firecrawl, which runs through Claude and isn’t configured here. Search in the Claude version, use Export CSV there, then Import CSV here.", true); $("findBtn").disabled = true; }
+    if (user){
+      try { myId = await user.id(); } catch {}
+      try { isAdmin = !!(await user.canEdit()); } catch {}
+      try { const w = await user.can("data.write"); if (w === false) readOnly = true; } catch {}
+    }
+    if (myId) await ldb.meta.put({ k: "me", v: myId }); else { const m = await ldb.meta.get("me"); myId = m?.v || null; }
+    updatePill(); scheduleRender();
+    if (rdb){ subscribe(); registerMember(); flush(); }
+  })();
+
+  async function resolveNames(){
+    if (!user?.profiles) return;
+    const ids = new Set();
+    for (const r of L.values()){ if (r.addedBy) ids.add(r.addedBy); if (r.updatedBy) ids.add(r.updatedBy); if (r.lastCallBy) ids.add(r.lastCallBy); }
+    for (const c of C.values()) if (c.by) ids.add(c.by);
+    for (const a of A.values()) if (a.to) ids.add(a.to);
+    for (const m of M) ids.add(m);
+    const todo = [...ids].filter(i => !(i in names));
+    if (!todo.length) return;
+    try { const ps = await user.profiles(todo); for (const id of todo) names[id] = ps?.[id]?.isMe ? "You" : (ps?.[id]?.name || "Teammate"); scheduleRender(); }
+    catch {}
+  }
+  // Team roster: reps you can assign before they ever open the page ("r:<id>"), optionally linked to a signed-in account
+  const rosterOfUser = uid => { for (const r of R.values()) if (uid && r.linkedUser === uid) return r; return null; };
+  const canon = id => { if (!id) return ""; if (String(id).startsWith("r:")) return id; const r = rosterOfUser(id); return r ? "r:" + r.id : id; };
+  const nameOf = id => {
+    if (!id) return "";
+    if (String(id).startsWith("r:")){ const r = R.get(id.slice(2)); return r ? r.name + (r.linkedUser && r.linkedUser === myId ? " (you)" : "") : "Former rep"; }
+    const r = rosterOfUser(id); if (r) return r.name + (id === myId ? " (you)" : "");
+    return id === myId ? "You" : (names[id] || "Teammate");
+  };
+  const ownerOf = id => A.get(id)?.to || "";
+  const isMine = to => !!to && (to === myId || (String(to).startsWith("r:") && R.get(to.slice(2))?.linkedUser === myId));
+  // everyone a lead can be assigned to: roster reps, then signed-in members not on the roster
+  function assignees(){
+    const out = [...R.values()].sort((a, b) => a.name.localeCompare(b.name)).map(r => ["r:" + r.id, nameOf("r:" + r.id)]);
+    const ids = new Set([...M]); if (myId) ids.add(myId);
+    for (const id of ids) if (!rosterOfUser(id)) out.push([id, nameOf(id)]);
+    return out;
+  }
+
+  // ================= views =================
+  function setView(v){
+    view = v;
+    $("tFind").classList.toggle("on", v === "find"); $("tPipe").classList.toggle("on", v === "pipe"); $("tDash").classList.toggle("on", v === "dash");
+    $("findView").classList.toggle("hidden", v !== "find"); $("pipeView").classList.toggle("hidden", v !== "pipe"); $("dashView").classList.toggle("hidden", v !== "dash");
+    if (v === "pipe"){ $("eyebrow").textContent = "Pipeline"; $("title").innerHTML = 'Every lead. <em>One place.</em>'; $("sub").textContent = "Log calls in one tap, schedule follow-ups and keep working offline. Everything syncs when you’re back online."; }
+    else if (v === "dash"){ $("eyebrow").textContent = "Dashboard"; $("title").innerHTML = 'How the team <em>is doing.</em>'; $("sub").textContent = "Calls, conversations and demos booked by each rep, from the call log."; }
+    else { const Md = MODES[mode]; $("eyebrow").textContent = Md.eyebrow; $("title").innerHTML = Md.title; $("sub").textContent = Md.sub; }
+    renderAll();
+  }
+  $("tFind").onclick = () => setView("find");
+  $("tPipe").onclick = () => setView("pipe");
+  $("tDash").onclick = () => setView("dash");
+  function renderAll(){
+    $("pipeCount").textContent = L.size;
+    updatePill();
+    if (view === "find") render(); else if (view === "pipe") renderPipe(); else renderDash();
+    if (openId) renderSheet();
+  }
+
+  function setMode(m){
+    if (busy) return;
+    mode = m; leads = []; status("");
+    $("mRecep").classList.toggle("on", m === "recep"); $("mWeb").classList.toggle("on", m === "web");
+    const Md = MODES[m];
+    $("eyebrow").textContent = Md.eyebrow; $("title").innerHTML = Md.title; $("sub").textContent = Md.sub; $("tip").textContent = Md.tip;
+    $("kind").value = Md.kind; $("city").value = Md.city; $("showAllLabel").textContent = Md.showAll; $("showAll").checked = false;
+    $("extraRow").classList.toggle("hidden", m !== "recep");
+    $("quick").innerHTML = "";
+    Md.quick.forEach(([k,c]) => {
+      const b = document.createElement("button"); b.className = "chip"; b.textContent = `${k} · ${c}`;
+      b.onclick = () => { $("kind").value = k; $("city").value = c; };
+      $("quick").appendChild(b);
+    });
+    render();
+  }
+  $("mRecep").onclick = () => setMode("recep");
+  $("mWeb").onclick = () => setMode("web");
+
+  // ---------------- scoring ----------------
+  function scoreWeb(r){
+    const w = (r.website || "").trim();
+    const k = !w ? "lead" : WEAK.test(w) ? "weak" : "has";
+    const bits = [k === "lead" ? "No website on Google" : k === "weak" ? "Only a free page (" + host(w) + ")" : "Has a site"];
+    if (r.rating && r.review_count) bits.push(`${r.rating}★ from ${fmtN(r.review_count)} reviews`); else bits.push("no reviews yet");
+    if (r.review_count >= 25 && k !== "has") bits.push("busy enough to pay for a site");
+    if (!r.phone) bits.push("no phone listed");
+    if (!r.address) bits.push("service-area business");
+    return { tier: k, score: k === "lead" ? 2 : k === "weak" ? 1 : 0, reason: bits.join(" · ") };
+  }
+  function scoreRecep(r){
+    const bits = []; let s = 0;
+    const urgent = (r.categories || []).find(c => URGENT.test(c)) || (URGENT.test(r.name || "") ? (r.categories||[])[0] : null);
+    const afterWork = !urgent && ((r.categories || []).find(c => AFTER_WORK.test(c)) || null);
+    if (urgent){ s += 3; bits.push(`${urgent}: urgent calls come nights and weekends`); }
+    else if (afterWork){ s += 2; bits.push(`${afterWork}: customers call after their own workday`); }
+    else { s -= 1; bits.push(`${(r.categories||[])[0] || "Business"}: not a typical after-hours fit`); }
+    const n = r.review_count || 0;
+    if (n >= 500){ s += 3; bits.push(`${fmtN(n)} reviews = heavy call volume`); }
+    else if (n >= 150){ s += 2; bits.push(`${fmtN(n)} reviews = steady calls`); }
+    else if (n >= 40){ s += 1; bits.push(`${fmtN(n)} reviews`); }
+    else bits.push(n ? `only ${n} reviews` : "no reviews yet");
+    const franchise = FRANCHISE.test(r.name || "") || (r.website && (FRANCHISE.test(host(r.website)) || CHAIN_PATH.test(r.website)));
+    if (franchise){ s -= 4; bits.push("franchise or chain: corporate likely handles the phones"); }
+    else if (!r.address){ s += 1; bits.push("service-area business, likely owner-run"); }
+    else { bits.push("local business"); }
+    if (!r.phone){ s -= 5; bits.push("no phone listed"); }
+    const tier = s >= 5 ? "hot" : s >= 3 ? "good" : "low";
+    return { tier, score: s, reason: bits.join(" · ") };
+  }
+  const TAGS = { hot:["Hot","t-hot"], good:["Good","t-good"], low:["Low","t-low"], lead:["No website","t-lead"], weak:["Free page","t-weak"], has:["Has site","t-has"] };
+  function isShown(l){ return mode === "recep" ? l.tier !== "low" : l.tier !== "has"; }
+
+
+  // ================= Find (Firecrawl search — unchanged) =================
+  async function search(){
+    if (!mcp || busy) return;
+    if (!navigator.onLine){ status("Searching needs an internet connection. Your pipeline still works offline.", true); return; }
+    const kind = $("kind").value.trim(), city = $("city").value.trim();
+    if (!kind || !city){ status("Enter a business type and a city.", true); return; }
+    const pages = +$("pages").value, query = `${kind} ${city}`;
+    busy = true; $("findBtn").disabled = true; lastQuery = query;
+    const seen = new Map(); let cursor = null;
+    try{
+      for (let i = 0; i < pages; i++){
+        status(`Searching Google Maps for “${query}”… (${i * 20 + 1}–${i * 20 + 20})`);
+        const options = { query }; if (cursor) options.cursor = String(cursor);
+        const res = await mcp.callTool("Firecrawl", "firecrawl_scrape", {
+          alexandria: { provider: "firecrawl-maps", capability: "businesses/search", options },
+          objective: "Find local commercial businesses for B2B outreach"
+        });
+        const { results, next } = extract(res?.payload);
+        results.forEach(r => { const id = r.feature_id || r.place_id || r.name; if (id && !seen.has(id)) seen.set(id, r); });
+        cursor = next; if (!cursor) break;
+      }
+      const scorer = mode === "recep" ? scoreRecep : scoreWeb;
+      leads = [...seen.values()].map(r => ({ id: leadId(r), r, ...scorer(r), text: "", email: "" }));
+      leads.sort((a,b) => b.score - a.score || (b.r.review_count||0) - (a.r.review_count||0));
+      const good = leads.filter(isShown).length;
+      status(good ? "" : mode === "recep" ? `Nothing scored well in the top ${seen.size} for “${query}”. Try an emergency trade or another city.` : `No businesses without a website in the top ${seen.size} for “${query}”. Try a smaller town or a different trade.`);
+      render();
+    } catch(e){ status(errorText(e), true); if (leads.length) render(); }
+    finally { busy = false; $("findBtn").disabled = !mcp; }
+  }
+  function bodyFor(l){
+    const r = l.r, now = nowIso();
+    return {
+      name: r.name || "", phone: r.phone || "", phone_e164: r.phone_e164 || e164(r.phone), category: (r.categories||[])[0] || "",
+      city: cityOf(r), address: r.address || "", rating: r.rating ?? null, review_count: r.review_count ?? null,
+      website: r.website || "", maps: gmaps(r) || "", offer: mode, tier: l.tier, score: l.score, reason: l.reason,
+      query: lastQuery, stage: "new", followUp: "", notes: "", text: l.text || "", email: l.email || "",
+      addedBy: myId || null, updatedBy: myId || null, addedAt: now, updatedAt: now
+    };
+  }
+  // a lead found again under another id (same phone, or same name in the same city) is the same business: never save it twice.
+  // Names are compared without legal endings, so "Guster Law Firm, LLC" and "Guster Law Firm" match.
+  function coreName(s){ return normName(String(s || "").replace(/[’'`.,]/g, "")).replace(/\b(the|llc|inc|incorporated|pc|pllc|apc|pa|ltd|corp|corporation|co|esq|and associates|associates)\b/g, " ").replace(/\s+/g, " ").trim(); }
+  function findDuplicate(body, exceptId){
+    const ph = body.phone_e164 || e164(body.phone), nn = coreName(body.name), cc = normName(body.city).split(" ").slice(0, 2).join(" ");
+    for (const r of L.values()){
+      if (r.id === exceptId) continue;
+      if (ph && (r.phone_e164 || e164(r.phone)) === ph) return r;
+      if (nn && coreName(r.name) === nn && cc && normName(r.city).startsWith(cc)) return r;
+    }
+    return null;
+  }
+  async function saveLead(l){
+    if (readOnly || L.has(l.id)) return true;
+    const body = bodyFor(l);
+    if (findDuplicate(body, l.id)) return true;
+    await createLead(l.id, body); return true;
+  }
+  $("saveAllBtn").onclick = async () => {
+    const todo = leads.filter(l => ($("showAll").checked || isShown(l)) && !L.has(l.id));
+    if (!todo.length){ status("Everything shown is already in your pipeline."); return; }
+    $("saveAllBtn").disabled = true;
+    let n = 0, dup = 0;
+    for (const l of todo){ const body = bodyFor(l); if (findDuplicate(body, l.id)) { dup++; continue; } await createLead(l.id, body); n++; status(`Saving ${n}…`); }
+    status(`Saved ${n} lead${n === 1 ? "" : "s"} to your pipeline` + (dup ? ` · ${dup} already there under another listing` : "") + ".");
+    $("saveAllBtn").disabled = false;
+  };
+
+  function render(){
+    const showAll = $("showAll").checked;
+    const st = $("stats"); st.innerHTML = "";
+    const groups = mode === "recep" ? [["hot","s-lead","Hot"],["good","s-weak","Good"],["low","s-has","Low"]] : [["lead","s-lead","No website"],["weak","s-weak","Free page"],["has","s-has","Has site"]];
+    groups.forEach(([t, cls, label]) => {
+      const sp = document.createElement("span"); sp.className = cls;
+      const b = document.createElement("b"); b.textContent = leads.filter(l => l.tier === t).length;
+      sp.append(b, document.createTextNode(label)); st.appendChild(sp);
+    });
+    $("bar").classList.toggle("hidden", !leads.length);
+    $("tableWrap").classList.toggle("hidden", !leads.length);
+    $("saveAllBtn").classList.toggle("hidden", readOnly);
+    const list = leads.filter(l => showAll || isShown(l));
+    const tb = $("rows"); tb.innerHTML = "";
+    if (!list.length){
+      const tr = document.createElement("tr"); const td = document.createElement("td"); td.colSpan = 5; td.className = "empty";
+      td.textContent = "No strong leads here. Show everything to see the full list.";
+      tr.appendChild(td); tb.appendChild(tr); return;
+    }
+    list.forEach(l => {
+      const r = l.r, tr = document.createElement("tr");
+      const c1 = document.createElement("td"); c1.append(bizCell(r.name, gmaps(r), [(r.categories||[])[0], cityOf(r), mode === "recep" && r.website ? host(r.website) : ""]));
+      const c2 = document.createElement("td"); const tg = document.createElement("span");
+      const [label, cls] = TAGS[l.tier]; tg.className = "tag " + cls; tg.textContent = label; c2.appendChild(tg);
+      if (mode === "recep"){ const sc = document.createElement("div"); sc.className = "score"; sc.textContent = "score " + l.score; c2.appendChild(sc); }
+      const c3 = document.createElement("td"); c3.className = "reason"; c3.textContent = l.reason;
+      const c4 = document.createElement("td"); c4.className = "mono"; c4.appendChild(phoneLink(r.phone, r.phone_e164));
+      const c5 = document.createElement("td");
+      const saved = L.get(l.id) || findDuplicate({ name: r.name, phone: r.phone, phone_e164: r.phone_e164, city: cityOf(r) }, l.id);
+      if (saved){ const s = document.createElement("div"); s.className = "saved"; s.textContent = "Saved · " + (STAGE_NAME[saved.stage] || "New"); c5.appendChild(s); }
+      else if (!readOnly){
+        const b = document.createElement("button"); b.className = "ghost small"; b.textContent = "Save";
+        b.onclick = async () => { b.disabled = true; await saveLead(l); };
+        c5.appendChild(b);
+      } else c5.textContent = "—";
+      tr.append(c1, c2, c3, c4, c5); tb.appendChild(tr);
+    });
+  }
+  function bizCell(name, link, meta){
+    const frag = document.createDocumentFragment();
+    const nm = document.createElement("div"); nm.className = "name";
+    if (link){ const a = document.createElement("a"); a.href = link; a.target = "_blank"; a.rel = "noopener"; a.textContent = name; nm.appendChild(a); } else nm.textContent = name;
+    const ct = document.createElement("div"); ct.className = "cat"; ct.textContent = meta.filter(Boolean).join(" · ");
+    frag.append(nm, ct); return frag;
+  }
+  // where a tapped number goes: the device's phone app (tel:) or the rep's Google Voice account in a new tab
+  let callVia = (() => { try { return localStorage.getItem("sm-callvia") || "tel"; } catch { return "tel"; } })();
+  function gvUrl(num){ return "https://voice.google.com/u/0/calls?a=nc," + encodeURIComponent(num); }
+  function phoneLink(phone, e){
+    if (!phone){ return document.createTextNode("—"); }
+    const num = e || e164(phone) || String(phone).replace(/[^\d+]/g, "");
+    const a = document.createElement("a"); a.textContent = phone;
+    if (callVia === "gv"){
+      a.href = gvUrl(num); a.target = "_blank"; a.rel = "noopener"; a.title = "Call with Google Voice (number copied)";
+      a.onclick = ev => { ev.stopPropagation(); try { navigator.clipboard?.writeText(num).catch(() => {}); } catch {} };
+    } else { a.href = "tel:" + num; a.onclick = ev => ev.stopPropagation(); }
+    return a;
+  }
+
+  // ================= Pipeline =================
+  function pipeList(){
+    const q = $("pSearch").value.trim().toLowerCase(), offer = $("pMode").value, camp = $("pCamp").value, t = today();
+    let list = [...L.values()];
+    if (offer) list = list.filter(d => d.offer === offer);
+    if (camp) list = list.filter(d => (d.campaign || "No campaign") === camp);
+    if (ownerFilter === "mine") list = list.filter(d => isMine(ownerOf(d.id)));
+    if (ownerFilter === "none") list = list.filter(d => !ownerOf(d.id));
+    if (q) list = list.filter(d => [d.name, d.city, d.category, d.notes, d.phone, d.campaign].join(" ").toLowerCase().includes(q));
+    if (stageFilter === "due") list = list.filter(d => d.followUp && d.followUp <= t && !CLOSED.includes(d.stage));
+    else if (stageFilter) list = list.filter(d => d.stage === stageFilter);
+    const order = Object.fromEntries(STAGES.map(([k], i) => [k, i]));
+    list.sort((a, b) => (order[a.stage] ?? 0) - (order[b.stage] ?? 0) || (a.followUp || "9999").localeCompare(b.followUp || "9999") || (b.score||0) - (a.score||0));
+    return list;
+  }
+  // campaign filter: one option per campaign found on saved leads, with counts
+  function refreshCampaigns(){
+    const sel = $("pCamp"), cur = sel.value, counts = {};
+    for (const d of L.values()){ const c = d.campaign || "No campaign"; counts[c] = (counts[c] || 0) + 1; }
+    const names = Object.keys(counts).sort((a, b) => a === "No campaign" ? 1 : b === "No campaign" ? -1 : a.localeCompare(b));
+    const sig = names.map(n => n + counts[n]).join("|");
+    if (sel.dataset.sig === sig) return;
+    sel.dataset.sig = sig; sel.innerHTML = "";
+    const o0 = document.createElement("option"); o0.value = ""; o0.textContent = "All campaigns"; sel.appendChild(o0);
+    names.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = `${n} (${counts[n]})`; sel.appendChild(o); });
+    sel.value = names.includes(cur) ? cur : "";
+  }
+  function renderPipe(){
+    refreshCampaigns(); renderBulk();
+    const t = today(), all = [...L.values()];
+    const scoped = ownerFilter === "mine" ? all.filter(d => isMine(ownerOf(d.id))) : ownerFilter === "none" ? all.filter(d => !ownerOf(d.id)) : all;
+    const due = scoped.filter(d => d.followUp && d.followUp <= t && !CLOSED.includes(d.stage)).length;
+    const st = $("stages"); st.innerHTML = "";
+    [["", "All", scoped.length], ["due", "Due", due], ...STAGES.map(([k, n]) => [k, n, scoped.filter(d => d.stage === k).length])].forEach(([k, n, c]) => {
+      const b = document.createElement("button"); b.className = "stage" + (stageFilter === k ? " on" : "") + (k === "due" ? " due" : "");
+      const bb = document.createElement("b"); bb.textContent = c; b.append(bb, document.createTextNode(n));
+      b.onclick = () => { stageFilter = k; renderPipe(); };
+      st.appendChild(b);
+    });
+    // conflicts banner
+    const cb = $("confBanner"); cb.innerHTML = "";
+    if (CONF.length){
+      const d = document.createElement("div"); d.className = "banner";
+      const s = document.createElement("span"); s.textContent = `${CONF.length} change${CONF.length === 1 ? "" : "s"} made offline clashed with someone else’s edit. Choose which to keep.`;
+      const b = document.createElement("button"); b.className = "ghost small"; b.textContent = "Review";
+      b.onclick = () => { const f = CONF.find(c => L.get(c.leadId)) || CONF[0]; if (L.get(f.leadId)) openSheet(f.leadId); else renderConflictOrphans(); };
+      d.append(s, b); cb.appendChild(d);
+    }
+    const repOnly = window.__STANDALONE && !isAdmin;   // reps: no import, export, adding leads or team-wide views
+    $("newLeadBtn").classList.toggle("hidden", readOnly || repOnly);
+    $("importBtn").classList.toggle("hidden", readOnly || repOnly);
+    $("pCsvBtn").classList.toggle("hidden", repOnly);
+    $("ownerSeg").classList.toggle("hidden", repOnly);
+    const pend = pendingIds();
+    const tb = $("pRows"); tb.innerHTML = "";
+    const list = pipeList();
+    if (!list.length){
+      const tr = document.createElement("tr"); const td = document.createElement("td"); td.colSpan = 6; td.className = "empty";
+      td.textContent = L.size ? "No leads match this filter." : rdb && !remoteReady.leads && navigator.onLine ? "Loading your pipeline…" : "No saved leads yet. Find some on the Find tab, add one, or import a CSV.";
+      tr.appendChild(td); tb.appendChild(tr); return;
+    }
+    list.forEach(d => {
+      const tr = document.createElement("tr"); tr.className = "rowopen";
+      tr.onclick = ev => { if (ev.target.closest("select,input,button,a,textarea")) return; openSheet(d.id); };
+      const c1 = document.createElement("td");
+      c1.append(bizCell(d.name, d.maps, [d.category, d.city, d.campaign]));
+      const ph = document.createElement("div"); ph.className = "mono"; ph.style.marginTop = "4px"; ph.appendChild(phoneLink(d.phone, d.phone_e164));
+      if (pend.has(d.id)){ const pd = document.createElement("span"); pd.className = "pend-dot"; pd.title = "Waiting to sync"; ph.appendChild(pd); }
+      c1.appendChild(ph);
+      const c2 = document.createElement("td");
+      const sel = document.createElement("select"); sel.disabled = readOnly;
+      STAGES.forEach(([k, n]) => { const o = document.createElement("option"); o.value = k; o.textContent = n; sel.appendChild(o); });
+      sel.value = d.stage || "new";
+      sel.onchange = () => {
+        const patch = { stage: sel.value };
+        if (sel.value === "contacted" && !d.followUp) patch.followUp = plusDays(3);
+        if (CLOSED.includes(sel.value)) patch.followUp = "";
+        patchLead(d.id, patch);
+      };
+      c2.appendChild(sel);
+      const c3 = document.createElement("td");
+      const di = document.createElement("input"); di.type = "date"; di.value = d.followUp || ""; di.disabled = readOnly;
+      di.onchange = () => patchLead(d.id, { followUp: di.value });
+      c3.appendChild(di);
+      if (d.followUp && d.followUp <= t && !CLOSED.includes(d.stage)){ const od = document.createElement("div"); od.className = "overdue"; od.textContent = d.followUp < t ? "Overdue" : "Due today"; c3.appendChild(od); }
+      const c4 = document.createElement("td"); const ow = ownerOf(d.id);
+      const op = document.createElement("span"); op.className = "pill"; op.textContent = ow ? nameOf(ow) : "Unassigned"; c4.appendChild(op);
+      const c5 = document.createElement("td"); c5.className = "cat";
+      c5.textContent = d.lastDisposition ? `${DISPO_NAME[d.lastDisposition] || d.lastDisposition} · ${when(d.lastCallAt)}` : "—";
+      const c6 = document.createElement("td");
+      const ob = document.createElement("button"); ob.className = "ghost small"; ob.textContent = "Open"; ob.onclick = () => openSheet(d.id);
+      c6.appendChild(ob);
+      tr.append(c1, c2, c3, c4, c5, c6); tb.appendChild(tr);
+    });
+  }
+  // "split evenly" only deals to the named team; accounts not on the roster are never auto-assigned
+  const splitTargets = () => { const t = [...R.values()].sort((a, b) => a.name.localeCompare(b.name)).map(r => ["r:" + r.id, nameOf("r:" + r.id)]); return t.length ? t : assignees(); };
+  function renderBulk(){
+    const w = $("bulkWrap"); w.classList.toggle("hidden", !isAdmin); if (!isAdmin) return;
+    const n = pipeList().length, sel = $("bulkTo"), cur = sel.value;
+    sel.innerHTML = "";
+    const add = (v, t) => { const o = document.createElement("option"); o.value = v; o.textContent = t; sel.appendChild(o); };
+    add("", `Assign ${n} shown lead${n === 1 ? "" : "s"} to…`);
+    const reps = assignees(), team = splitTargets();
+    if (team.length > 1) add("__split", `Split evenly between ${team.length} reps (${team.map(r => r[1].replace(" (you)", "")).join(", ")})`);
+    reps.forEach(([v, t]) => add(v, t));
+    add("__none", "Unassign");
+    sel.value = [...sel.options].some(o => o.value === cur) ? cur : "";
+  }
+  $("bulkGo").onclick = async () => {
+    const v = $("bulkTo").value; if (!v) return;
+    const list = pipeList(); if (!list.length) return;
+    const reps = v === "__split" ? splitTargets() : assignees();
+    const label = v === "__split" ? `split evenly between ${reps.map(r => r[1]).join(", ")}` : v === "__none" ? "unassign" : nameOf(v);
+    if (!confirm(`${label === "unassign" ? "Unassign" : "Assign"} ${list.length} lead${list.length === 1 ? "" : "s"}${label === "unassign" ? "" : " to " + label}?`)) return;
+    // split: hottest leads first, dealt round-robin so every rep gets the same mix
+    const ordered = [...list].sort((a, b) => (b.score || 0) - (a.score || 0));
+    const pairs = ordered.map((d, i) => [d.id, v === "__split" ? reps[i % reps.length][0] : v === "__none" ? "" : v]).filter(([id, to]) => ownerOf(id) !== to);
+    $("bulkGo").disabled = true;
+    await assignMany(pairs);
+    $("bulkGo").disabled = false; $("bulkTo").value = "";
+    pStatus(`${pairs.length} lead${pairs.length === 1 ? "" : "s"} updated. They sync to everyone when you’re online.`);
+  };
+  function renderConflictOrphans(){
+    // conflicts whose lead is no longer on this device (deleted elsewhere): offer to discard
+    for (const c of CONF.filter(c => !L.get(c.leadId))) resolveConflict(c.cid, "discard");
+  }
+  $("pSearch").addEventListener("input", () => renderPipe());
+  $("pMode").onchange = renderPipe;
+  $("pCamp").onchange = renderPipe;
+  [["oAll","all"],["oMine","mine"],["oNone","none"]].forEach(([id, v]) => $(id).onclick = () => {
+    ownerFilter = v; ["oAll","oMine","oNone"].forEach(x => $(x).classList.toggle("on", x === id)); renderPipe();
+  });
+
+  // ================= Lead sheet =================
+  function openSheet(id){ openId = id; renderSheet(); $("sheet").classList.add("show"); $("scrim").classList.add("show"); }
+  function closeSheet(){ openId = null; $("sheet").classList.remove("show"); $("scrim").classList.remove("show"); }
+  $("scrim").onclick = () => { closeSheet(); closeModals(); };
+  document.addEventListener("keydown", e => { if (e.key === "Escape"){ closeSheet(); closeModals(); } });
+
+  let sheetDraftNote = "";   // keeps a half-typed call note across re-renders
+  function renderSheet(){
+    const d = L.get(openId), sh = $("sheet");
+    const keepFocus = document.activeElement && sh.contains(document.activeElement) ? document.activeElement.id : null;
+    const noteEl = $("callNote"); if (noteEl) sheetDraftNote = noteEl.value;
+    sh.innerHTML = "";
+    const close = document.createElement("button"); close.className = "close"; close.textContent = "✕"; close.setAttribute("aria-label", "Close"); close.onclick = closeSheet; sh.appendChild(close);
+    if (!d){ const p = document.createElement("p"); p.className = "note"; p.textContent = "This lead was removed."; sh.appendChild(p); return; }
+    const h = document.createElement("h2"); h.textContent = d.name; sh.appendChild(h);
+    const sub = document.createElement("div"); sub.className = "cat"; sub.textContent = [d.category, d.city, d.campaign].filter(Boolean).join(" · "); sh.appendChild(sub);
+    const kv = document.createElement("div"); kv.className = "kv";
+    kv.appendChild(phoneLink(d.phone, d.phone_e164));
+    if (d.maps){ const a = document.createElement("a"); a.href = d.maps; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Google Maps"; kv.appendChild(a); }
+    if (d.website){ const a = document.createElement("a"); a.href = d.website; a.target = "_blank"; a.rel = "noopener"; a.textContent = host(d.website); kv.appendChild(a); }
+    const [tl, tc] = TAGS[d.tier] || []; if (tl){ const t = document.createElement("span"); t.className = "tag " + tc; t.textContent = (d.offer === "web" ? "Website · " : "") + tl; kv.appendChild(t); }
+    sh.appendChild(kv);
+    if (d.reason){ const r = document.createElement("p"); r.className = "reason"; r.style.marginTop = "10px"; r.textContent = d.reason; sh.appendChild(r); }
+
+    // conflicts for this lead
+    const mine = CONF.filter(c => c.leadId === d.id);
+    if (mine.length){
+      const h3 = document.createElement("h3"); h3.textContent = "Needs a decision"; sh.appendChild(h3);
+      mine.forEach(c => sh.appendChild(conflictCard(c)));
+    }
+
+    // log a call
+    const h3a = document.createElement("h3"); h3a.textContent = "Log a call"; sh.appendChild(h3a);
+    const note = document.createElement("textarea"); note.id = "callNote"; note.placeholder = "What was said (optional)"; note.value = sheetDraftNote; note.disabled = readOnly;
+    note.oninput = () => { sheetDraftNote = note.value; };
+    sh.appendChild(note);
+    const grid = document.createElement("div"); grid.className = "dispo"; grid.style.marginTop = "10px";
+    DISPO.forEach(([k, label, tone]) => {
+      const b = document.createElement("button"); b.textContent = label; if (tone) b.classList.add(tone); b.disabled = readOnly;
+      b.onclick = async () => {
+        if (k === "dnc" && !confirm(`Mark ${d.name} as do not call?`)) return;
+        const n = note.value.trim(); sheetDraftNote = "";
+        await logCall(d.id, k, n, $("fuDate")?.value || "");
+      };
+      grid.appendChild(b);
+    });
+    sh.appendChild(grid);
+    const noteOnly = document.createElement("button"); noteOnly.className = "linkbtn"; noteOnly.textContent = "Save as note without a call"; noteOnly.disabled = readOnly;
+    noteOnly.onclick = async () => { const n = note.value.trim(); if (!n) return; sheetDraftNote = ""; await logCall(d.id, "note", n); };
+    sh.appendChild(noteOnly);
+
+    // stage, follow-up, owner
+    const h3b = document.createElement("h3"); h3b.textContent = "Status"; sh.appendChild(h3b);
+    const r2 = document.createElement("div"); r2.className = "row2";
+    const s1 = document.createElement("div"); const l1 = document.createElement("label"); l1.textContent = "Stage"; s1.appendChild(l1);
+    const sel = document.createElement("select"); sel.disabled = readOnly; sel.id = "stSel";
+    STAGES.forEach(([k, n]) => { const o = document.createElement("option"); o.value = k; o.textContent = n; sel.appendChild(o); });
+    sel.value = d.stage || "new";
+    sel.onchange = () => { const p = { stage: sel.value }; if (CLOSED.includes(sel.value)) p.followUp = ""; patchLead(d.id, p); };
+    s1.appendChild(sel);
+    const s2 = document.createElement("div"); const l2 = document.createElement("label"); l2.textContent = "Follow up"; s2.appendChild(l2);
+    const fu = document.createElement("input"); fu.type = "date"; fu.id = "fuDate"; fu.value = d.followUp || ""; fu.disabled = readOnly;
+    fu.onchange = () => patchLead(d.id, { followUp: fu.value });
+    s2.appendChild(fu);
+    const qk = document.createElement("div"); qk.className = "rowbtns";
+    [["Tomorrow", 1], ["+3 days", 3], ["+1 week", 7], ["Clear", null]].forEach(([lab, n]) => { const b = document.createElement("button"); b.className = "linkbtn"; b.textContent = lab; b.disabled = readOnly; b.onclick = () => patchLead(d.id, { followUp: n === null ? "" : plusDays(n) }); qk.appendChild(b); });
+    s2.appendChild(qk);
+    r2.append(s1, s2); sh.appendChild(r2);
+
+    const s3 = document.createElement("div"); s3.className = "field"; const l3 = document.createElement("label"); l3.textContent = "Assigned to"; s3.appendChild(l3);
+    const ow = ownerOf(d.id);
+    if (isAdmin){
+      const as = document.createElement("select"); as.id = "asSel";
+      const o0 = document.createElement("option"); o0.value = ""; o0.textContent = "Unassigned"; as.appendChild(o0);
+      const opts = assignees(); if (ow && !opts.some(([v]) => v === ow)) opts.push([ow, nameOf(ow)]);
+      opts.forEach(([v, n]) => { const o = document.createElement("option"); o.value = v; o.textContent = n; as.appendChild(o); });
+      as.value = ow; as.onchange = () => assignLead(d.id, as.value);
+      s3.appendChild(as);
+      const hint = document.createElement("div"); hint.className = "who"; hint.textContent = "Add or rename reps under Dashboard → Team."; s3.appendChild(hint);
+    } else { const p = document.createElement("span"); p.className = "pill"; p.textContent = ow ? nameOf(ow) : "Unassigned"; s3.appendChild(p); }
+    sh.appendChild(s3);
+
+    const s4 = document.createElement("div"); s4.className = "field"; const l4 = document.createElement("label"); l4.textContent = "Contact email"; s4.appendChild(l4);
+    const em = document.createElement("input"); em.id = "ctEmail"; em.value = d.contactEmail || ""; em.disabled = readOnly; em.inputMode = "email";
+    em.onchange = () => patchLead(d.id, { contactEmail: em.value.trim() });
+    s4.appendChild(em); sh.appendChild(s4);
+
+    const s5 = document.createElement("div"); s5.className = "field"; const l5 = document.createElement("label"); l5.textContent = "Lead notes"; s5.appendChild(l5);
+    const ta = document.createElement("textarea"); ta.id = "leadNotes"; ta.value = d.notes || ""; ta.placeholder = "Anything to remember about this business"; ta.disabled = readOnly;
+    ta.onchange = () => { if (ta.value !== (d.notes || "")) patchLead(d.id, { notes: ta.value.slice(0, 4000) }); };
+    s5.appendChild(ta); sh.appendChild(s5);
+
+    // drafts (existing feature)
+    const h3c = document.createElement("h3"); h3c.textContent = "Outreach"; sh.appendChild(h3c);
+    const outCell = document.createElement("div");
+    const db2 = document.createElement("button"); db2.className = "ghost small"; db2.textContent = d.email ? "Redraft message" : "Draft message"; db2.disabled = !sample || readOnly || !navigator.onLine;
+    db2.onclick = () => draftSaved(d.id, d, db2, outCell);
+    if (!sample && window.__STANDALONE){ const p = document.createElement("p"); p.className = "note"; p.textContent = "AI message drafting is only available in the Claude version. Drafts saved there still show below."; outCell.appendChild(p); }
+    else outCell.appendChild(db2);
+    showDrafts(d, outCell); sh.appendChild(outCell);
+
+    // history
+    const h3d = document.createElement("h3"); h3d.textContent = "Call history"; sh.appendChild(h3d);
+    const hist = [...C.values()].filter(c => c.leadId === d.id).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    if (!hist.length){ const p = document.createElement("p"); p.className = "note"; p.textContent = "No calls logged yet."; sh.appendChild(p); }
+    else {
+      const ul = document.createElement("ul"); ul.className = "hist";
+      hist.forEach(c => {
+        const li = document.createElement("li");
+        const top = document.createElement("div"); const b = document.createElement("b"); b.textContent = DISPO_NAME[c.disposition] || c.disposition; top.appendChild(b);
+        if (!c._synced){ const pd = document.createElement("span"); pd.className = "pend-dot"; pd.title = "Waiting to sync"; top.appendChild(pd); }
+        li.appendChild(top);
+        if (c.note){ const n = document.createElement("div"); n.style.whiteSpace = "pre-wrap"; n.style.marginTop = "2px"; n.textContent = c.note; li.appendChild(n); }
+        const m = document.createElement("div"); m.className = "meta"; m.textContent = `${nameOf(c.by) || "Someone"} · ${when(c.at)}`; li.appendChild(m);
+        ul.appendChild(li);
+      });
+      sh.appendChild(ul);
+    }
+    if (isAdmin){
+      const del = document.createElement("button"); del.className = "linkbtn danger"; del.style.marginTop = "22px"; del.textContent = "Remove lead";
+      del.onclick = async () => { if (!confirm(`Remove ${d.name} from the pipeline? Its call history stays in the dashboard.`)) return; closeSheet(); await deleteLead(d.id); };
+      sh.appendChild(del);
+    }
+    if (keepFocus && $(keepFocus)) $(keepFocus).focus();
+  }
+
+  const FIELD_NAME = { stage: "Stage", followUp: "Follow-up date", notes: "Lead notes", contactEmail: "Contact email", text: "Text draft", email: "Email draft" };
+  function fmtVal(f, v){ if (f === "stage") return STAGE_NAME[v] || v || "—"; return v === "" || v == null ? "—" : String(v); }
+  function conflictCard(c){
+    const box = document.createElement("div"); box.className = "conf";
+    if (c.field === "_deleted"){
+      box.textContent = "Someone removed this lead while you were editing it offline. ";
+      const r = document.createElement("div"); r.className = "rowbtns"; r.style.marginTop = "8px";
+      const a = document.createElement("button"); a.className = "ghost small"; a.textContent = "Restore with my changes"; a.onclick = () => resolveConflict(c.cid, "restore");
+      const b = document.createElement("button"); b.className = "linkbtn"; b.textContent = "Let it go"; b.onclick = async () => { closeSheet(); await resolveConflict(c.cid, "discard"); };
+      r.append(a, b); box.appendChild(r); return box;
+    }
+    const t = document.createElement("div"); t.textContent = `${FIELD_NAME[c.field] || c.field} was changed by someone else while you were offline.`; box.appendChild(t);
+    const vs = document.createElement("div"); vs.className = "vs";
+    const a = document.createElement("div"); const ab = document.createElement("b"); ab.textContent = "Yours"; a.append(ab, document.createTextNode(fmtVal(c.field, c.mine)));
+    const b = document.createElement("div"); const bb = document.createElement("b"); bb.textContent = "Theirs"; b.append(bb, document.createTextNode(fmtVal(c.field, c.theirs)));
+    vs.append(a, b); box.appendChild(vs);
+    const r = document.createElement("div"); r.className = "rowbtns";
+    const k1 = document.createElement("button"); k1.className = "ghost small"; k1.textContent = "Keep mine"; k1.onclick = () => resolveConflict(c.cid, "mine");
+    const k2 = document.createElement("button"); k2.className = "ghost small"; k2.textContent = "Keep theirs"; k2.onclick = () => resolveConflict(c.cid, "theirs");
+    r.append(k1, k2);
+    if (["notes","text","email"].includes(c.field)){ const k3 = document.createElement("button"); k3.className = "ghost small"; k3.textContent = "Keep both"; k3.onclick = () => resolveConflict(c.cid, "both"); r.appendChild(k3); }
+    box.appendChild(r); return box;
+  }
+
+  function showDrafts(d, cell){
+    cell.querySelectorAll(".draft").forEach(n => n.remove());
+    [["Text / call opener", d.text], ["First email", d.email]].forEach(([h, t]) => {
+      if (!t) return;
+      const box = document.createElement("div"); box.className = "draft";
+      const hh = document.createElement("h4"); hh.textContent = h; box.appendChild(hh);
+      box.appendChild(document.createTextNode(t)); cell.appendChild(box);
+    });
+  }
+  function draftPrompt(d){
+    const facts = { business: d.name, category: d.category, city: d.city, rating: d.rating, review_count: d.review_count, why_a_fit: d.reason, notes_so_far: d.notes || undefined };
+    if (d.offer === "web"){
+      facts.website_status = d.tier === "lead" ? "no website at all" : "only a free page at " + host(d.website);
+      return `You write cold outreach for Christopher Granados of Strata Marquee Group, who builds simple, fast websites for local US businesses ($500–1,200 one-time; he builds every site himself). Booking link: ${BOOK}
+
+Business facts (JSON): ${JSON.stringify(facts)}
+
+Write two things in a friendly, plain, human tone — no hype, no emoji, no "I hope this finds you well":
+1. "text": a text message under 300 characters, which he will send by hand. Say who he is, mention one specific fact (their rating/reviews or their trade and town), ask one easy question, and end with "Reply STOP to opt out."
+2. "email": a first email under 120 words with a subject line on the first line as "Subject: ...", one specific detail about them, the price range, the booking link, signed "Christopher Granados, Strata Marquee Group", and a last line "[mailing address] · Reply \\"no thanks\\" and I won't follow up."
+
+Reply with JSON only: {"text": "...", "email": "..."}`;
+    }
+    const demo = $("demoLine").value.trim();
+    return `You write cold outreach for Christopher Granados of Strata Marquee Group. Strata Marquee sets up AI receptionists for commercial businesses: it answers the phone after hours, on weekends and when the front desk is busy, takes the caller's details, answers common questions, books appointments, and texts anything urgent to whoever is on call. It works with their existing number through call forwarding. Christopher sets up each one himself. Never quote a price. Booking link for a free 15-minute demo: ${BOOK}${demo ? `\nDemo line: ${demo} — prospects can call it after 5 p.m. to hear the AI receptionist answer.` : ""}
+
+Business facts (JSON): ${JSON.stringify(facts)}
+
+Write two things in a friendly, plain, human tone — no hype, no emoji, no "I hope this finds you well":
+1. "text": a text message under 300 characters, which he will send by hand. Say who he is, tie it to their trade (for example a burst pipe at 9 p.m., a tenant lockout, an accident intake call on Sunday), ask one easy question about what happens to their calls after hours${demo ? ", mention they can call the demo line to hear it" : ""}, and end with "Reply STOP to opt out."
+2. "email": a first email under 130 words with a subject line on the first line as "Subject: ...", one specific detail about them (their trade, town or review count), the after-hours problem in their terms, ${demo ? "an invitation to call the demo line after 5 p.m., " : ""}the booking link, signed "Christopher Granados, Strata Marquee Group", and a last line "[mailing address] · Reply \\"no thanks\\" and I won't follow up."
+
+Reply with JSON only: {"text": "...", "email": "..."}`;
+  }
+
+
+  async function draftSaved(id, d, btn, cell){
+    if (!sample) return;
+    btn.disabled = true; btn.textContent = "Writing…";
+    try{
+      const out = await sample.json(draftPrompt(d), { modelTier: "quick", cache: false });
+      const text = String(out?.text || "").trim().slice(0, 1000), email = String(out?.email || "").trim().slice(0, 4000);
+      if (!readOnly) await patchLead(id, { text, email });
+      else showDrafts({ text, email }, cell);
+    } catch(e){
+      btn.textContent = "Draft message"; btn.disabled = false;
+      if (e?.code === "not_granted"){ sample = null; btn.disabled = true; btn.title = "Drafting needs your OK to use Claude"; return; }
+      const box = document.createElement("div"); box.className = "draft"; box.textContent = e?.code === "rate_limited" ? "Too many at once. Wait a moment and try again." : "Couldn’t write a draft. Try again.";
+      cell.appendChild(box);
+    }
+  }
+
+  // ================= New lead =================
+  function closeModals(){ ["newModal","impModal"].forEach(id => $(id).classList.remove("show")); if (!openId) $("scrim").classList.remove("show"); }
+  $("newLeadBtn").onclick = () => { ["nlName","nlPhone","nlCat","nlCity","nlEmail","nlNotes"].forEach(i => $(i).value = ""); msg($("nlMsg"), ""); $("newModal").classList.add("show"); $("scrim").classList.add("show"); $("nlName").focus(); };
+  $("nlCancel").onclick = closeModals;
+  $("nlSave").onclick = async () => {
+    const name = $("nlName").value.trim(); if (!name){ msg($("nlMsg"), "Add the business name.", true); return; }
+    const phone = $("nlPhone").value.trim(), city = $("nlCity").value.trim();
+    const body = { name, phone, phone_e164: e164(phone), category: $("nlCat").value.trim(), city, address: "", rating: null, review_count: null,
+      website: "", maps: "", offer: $("nlOffer").value, tier: "", score: 0, reason: "Added by hand", query: "", stage: "new", followUp: "",
+      notes: $("nlNotes").value.trim(), text: "", email: "", contactEmail: $("nlEmail").value.trim(), addedBy: myId || null, addedAt: nowIso() };
+    const dup = findDuplicate(body);
+    if (dup){ msg($("nlMsg"), `${dup.name} is already in your pipeline.`, true); return; }
+    const id = "m_" + (body.phone_e164 ? safeId(body.phone_e164) : fnv(normName(name) + "|" + normName(city)));
+    if (L.has(id)){ msg($("nlMsg"), "That lead is already in your pipeline.", true); return; }
+    await createLead(id, body);
+    closeModals(); openSheet(id);
+  };
+
+  // ================= CSV import / export =================
+  let impPlan = null;
+  $("importBtn").onclick = () => { $("importFile").value = ""; $("importFile").click(); };
+  $("importFile").onchange = () => {
+    const f = $("importFile").files[0]; if (!f) return;
+    Papa.parse(f, { header: true, skipEmptyLines: true, complete: res => planImport(res.data), error: () => pStatus("That file couldn’t be read as a CSV.", true) });
+  };
+  function col(row, ...names){ const low = {}; for (const k in row) low[k.toLowerCase().trim().replace(/\s+/g, "_")] = row[k]; for (const n of names) if (low[n] != null && String(low[n]).trim() !== "") return String(low[n]).trim(); return ""; }
+  const STAGE_FROM = Object.fromEntries([...STAGES.map(([k, n]) => [n.toLowerCase(), k]), ...STAGES.map(([k]) => [k, k]), ["booked","demo"], ["called","contacted"], ["not_interested","lost"], ["do_not_call","dnc"]]);
+  function planImport(rows){
+    const plan = { create: [], fill: [], skip: 0 };
+    const batch = new Map();
+    for (const row of rows){
+      const name = col(row, "company", "business", "name", "business_name"); if (!name){ plan.skip++; continue; }
+      const phone = col(row, "phone", "phone_number", "phone_e164");
+      const maps = col(row, "google_maps", "maps");
+      const placeId = (maps.match(/place_id:([^&\s]+)/) || [])[1];
+      const body = {
+        name, phone, phone_e164: e164(phone), category: col(row, "category", "business_type", "type"), city: col(row, "city", "location"),
+        address: col(row, "address"), website: col(row, "website"), maps, contactEmail: col(row, "contact_email", "email_address", "work_email") || (/@/.test(col(row, "email")) && !/\n/.test(col(row, "email")) ? col(row, "email") : ""),
+        notes: col(row, "notes"), reason: col(row, "reason"), rating: Number(col(row, "rating")) || null, review_count: Number(col(row, "review_count")) || null,
+        offer: /web/i.test(col(row, "offer")) ? "web" : "recep", stage: STAGE_FROM[col(row, "stage", "outreach_status").toLowerCase()] || "new",
+        campaign: col(row, "campaign"),
+        followUp: /^\d{4}-\d{2}-\d{2}$/.test(col(row, "next_follow_up", "follow_up", "followup")) ? col(row, "next_follow_up", "follow_up", "followup") : ""
+      };
+      const id = col(row, "id") ? safeId(col(row, "id")) : placeId ? safeId(decodeURIComponent(placeId)) : "i_" + (body.phone_e164 ? safeId(body.phone_e164) : fnv(normName(name) + "|" + normName(body.city)));
+      const existing = L.get(id) || findDuplicate(body);
+      const key = existing ? existing.id : id;
+      if (batch.has(key)){ plan.skip++; continue; }        // duplicate row inside the file
+      batch.set(key, true);
+      if (existing){
+        const fill = {};
+        for (const k of ["phone","phone_e164","category","city","address","website","maps","contactEmail","campaign"]) if (!existing[k] && body[k]) fill[k] = body[k];
+        if (Object.keys(fill).length) plan.fill.push({ id: existing.id, fill }); else plan.skip++;
+      } else {
+        // priority A/B/C (or hot/good/low) becomes the same Hot/Good/Low tag search results get
+        const pr = col(row, "priority", "fit").toLowerCase();
+        const tier = /^(a|hot)$/.test(pr) ? "hot" : /^(b|good)$/.test(pr) ? "good" : /^(c|low)$/.test(pr) ? "low" : "";
+        plan.create.push({ id, body: { tier, score: tier === "hot" ? 6 : tier === "good" ? 4 : tier === "low" ? 1 : 0, query: body.campaign || "import", text: "", email: "", addedBy: myId || null, addedAt: nowIso(), ...body } });
+      }
+    }
+    impPlan = plan;
+    $("impSummary").textContent = `${plan.create.length} new lead${plan.create.length === 1 ? "" : "s"} · ${plan.fill.length} existing lead${plan.fill.length === 1 ? "" : "s"} get missing details filled in · ${plan.skip} skipped (already here or no business name). Existing stages, notes and follow-ups are never overwritten.`;
+    msg($("impMsg"), ""); $("impGo").disabled = !(plan.create.length + plan.fill.length);
+    $("impModal").classList.add("show"); $("scrim").classList.add("show");
+  }
+  $("impCancel").onclick = closeModals;
+  $("impGo").onclick = async () => {
+    if (!impPlan) return; $("impGo").disabled = true;
+    let n = 0; const total = impPlan.create.length + impPlan.fill.length;
+    for (const c of impPlan.create){ await createLead(c.id, c.body); msg($("impMsg"), `Importing ${++n} of ${total}…`); }
+    for (const f of impPlan.fill){ await patchLead(f.id, f.fill); msg($("impMsg"), `Importing ${++n} of ${total}…`); }
+    impPlan = null; closeModals(); pStatus(`Imported ${n} lead${n === 1 ? "" : "s"}. They’re saved on this device and will sync when you’re online.`);
+  };
+
+  function csvCell(v){ v = v == null ? "" : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
+  function buildCsv(list){
+    const head = ["id","campaign","priority","company","phone","contact_email","stage","outreach_status","next_follow_up","assigned_to","last_disposition","last_call_at","calls","notes","offer","fit","score","reason","category","city","address","rating","review_count","website","google_maps","text_draft","email_draft","added_at"];
+    const counts = {}; for (const c of C.values()) if (c.disposition !== "note") counts[c.leadId] = (counts[c.leadId] || 0) + 1;
+    return "\ufeff" + [head.join(",")].concat(list.map(d => [
+      d.id, d.campaign || "", ({ hot: "A", good: "B", low: "C" })[d.tier] || "", d.name, d.phone, d.contactEmail, STAGE_NAME[d.stage] || d.stage, CALL_STATUS[d.stage] || "new", d.followUp, nameOf(ownerOf(d.id)), DISPO_NAME[d.lastDisposition] || "", d.lastCallAt || "", counts[d.id] || 0,
+      d.notes, d.offer === "web" ? "website" : "ai receptionist", ((TAGS[d.tier] || [d.tier || ""])[0] || "").toLowerCase(), d.score, d.reason, d.category, d.city, d.address, d.rating, d.review_count, d.website, d.maps, d.text, d.email, d.addedAt
+    ].map(csvCell).join(","))).join("\r\n");
+  }
+  $("pCsvBtn").onclick = async () => {
+    const list = pipeList();
+    if (!list.length){ pStatus("Nothing to export with this filter.", true); return; }
+    const data = buildCsv(list);
+    if (downloads){
+      try { await downloads.save({ filename: "pipeline-" + today() + ".csv", data }); return; }
+      catch(e){ if (e?.code === "declined") return; }
+    }
+    pStatus("Downloading isn’t available in this view.", true);
+  };
+
+  // ================= Dashboard =================
+  $("periodSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+    period = +b.dataset.p; $("periodSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); renderDash();
+  });
+  function repStats(){
+    const since = period ? (() => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() - (period - 1)); return d.toISOString(); })() : "";
+    const t = today();
+    const reps = new Map();
+    const get = id => { const k = id || "?"; if (!reps.has(k)) reps.set(k, { id: k, calls: 0, talked: 0, demos: 0, open: 0, due: 0, overdue: 0, won: 0 }); return reps.get(k); };
+    for (const r of R.values()) get("r:" + r.id);
+    for (const id of M) if (!rosterOfUser(id)) get(id);
+    for (const c of C.values()){
+      if (c.disposition === "note" || (since && String(c.at) < since)) continue;
+      const r = get(canon(c.by)); r.calls++; if (TALKED.includes(c.disposition)) r.talked++; if (c.disposition === "demo") r.demos++;
+    }
+    for (const d of L.values()){
+      const ow = canon(ownerOf(d.id)); if (!ow) continue; const r = get(ow);
+      if (d.stage === "won") r.won++;
+      if (!CLOSED.includes(d.stage)){ r.open++; if (d.followUp && d.followUp === t) r.due++; if (d.followUp && d.followUp < t) r.overdue++; }
+    }
+    return [...reps.values()].filter(r => r.id !== "?" || r.calls);
+  }
+  function renderTeam(){
+    const tb = $("teamRows"); if (!tb) return; tb.innerHTML = "";
+    $("teamAdd").classList.toggle("hidden", !isAdmin);
+    const counts = {}; for (const d of L.values()){ const o = canon(ownerOf(d.id)); if (o) counts[o] = (counts[o] || 0) + 1; }
+    const reps = [...R.values()].sort((a, b) => a.name.localeCompare(b.name));
+    if (!reps.length){ const tr = document.createElement("tr"); const td = document.createElement("td"); td.colSpan = 4; td.className = "empty"; td.textContent = "No reps yet."; tr.appendChild(td); tb.appendChild(tr); return; }
+    const taken = new Set(reps.map(r => r.linkedUser).filter(Boolean));
+    reps.forEach(r => {
+      const tr = document.createElement("tr");
+      const c1 = document.createElement("td"); c1.className = "name"; c1.textContent = r.name;
+      const c2 = document.createElement("td");
+      if (isAdmin){
+        const sel = document.createElement("select"); sel.style.cssText = "width:auto;min-width:200px;height:34px;padding:6px 28px 6px 10px;font-size:13.5px;background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px";
+        const o0 = document.createElement("option"); o0.value = ""; o0.textContent = "Not linked yet"; sel.appendChild(o0);
+        const ids = new Set([...M]); if (myId) ids.add(myId);
+        [...ids].filter(id => id === r.linkedUser || !taken.has(id)).forEach(id => { const o = document.createElement("option"); o.value = id; o.textContent = id === myId ? "You" : (names[id] || "Teammate"); sel.appendChild(o); });
+        sel.value = r.linkedUser || "";
+        sel.onchange = () => saveRep(r.id, { name: r.name, linkedUser: sel.value });
+        c2.appendChild(sel);
+      } else c2.textContent = r.linkedUser ? (r.linkedUser === myId ? "You" : (names[r.linkedUser] || "Linked")) : "Not linked yet";
+      const c3 = document.createElement("td"); c3.className = "num"; c3.textContent = counts["r:" + r.id] || 0;
+      const c4 = document.createElement("td");
+      if (isAdmin){ const b = document.createElement("button"); b.className = "linkbtn danger"; b.textContent = "Remove";
+        b.onclick = async () => { if (!confirm(`Remove ${r.name} from the team? Leads assigned to them stay assigned until you reassign them.`)) return; await removeRep(r.id); };
+        c4.appendChild(b); }
+      tr.append(c1, c2, c3, c4); tb.appendChild(tr);
+    });
+  }
+  async function saveRep(id, body){
+    if (!rdb || !isAdmin) return;
+    try { await withTimeout(rdb.collection("roster").doc(id).set(body), WRITE_MS); msg($("teamMsg"), ""); }
+    catch(e){ msg($("teamMsg"), e?.code === "timeout" || e?.code === "unavailable" ? "Team changes need a connection. Try again when you’re online." : "That change wasn’t saved (" + (e?.code || "error") + ").", true); }
+  }
+  async function removeRep(id){
+    if (!rdb || !isAdmin) return;
+    try { await withTimeout(rdb.collection("roster").doc(id).delete(), WRITE_MS); }
+    catch(e){ msg($("teamMsg"), "Team changes need a connection. Try again when you’re online.", true); }
+  }
+  $("addRepBtn").onclick = async () => {
+    const name = $("newRep").value.trim().replace(/\s+/g, " "); if (!name) return;
+    if ([...R.values()].some(r => r.name.toLowerCase() === name.toLowerCase())){ msg($("teamMsg"), `${name} is already on the team.`, true); return; }
+    const id = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || ("rep-" + Date.now());
+    await saveRep(id, { name, linkedUser: "" }); $("newRep").value = "";
+  };
+  function renderDash(){
+    renderTeam();
+    const rs = repStats();
+    const sum = k => rs.reduce((a, r) => a + r[k], 0);
+    const calls = sum("calls"), talked = sum("talked"), demos = sum("demos");
+    const k = $("kpis"); k.innerHTML = "";
+    [[calls, "Calls"], [talked, "Conversations"], [demos, "Demos booked"], [calls ? Math.round(demos / calls * 100) + "%" : "—", "Book rate"], [sum("overdue"), "Overdue follow-ups"]].forEach(([v, l]) => {
+      const c = document.createElement("div"); c.className = "kpi"; const b = document.createElement("b"); b.textContent = v; const s = document.createElement("span"); s.textContent = l; c.append(b, s); k.appendChild(c);
+    });
+    const tb = $("dRows"); tb.innerHTML = "";
+    if (!rs.length){ const tr = document.createElement("tr"); const td = document.createElement("td"); td.colSpan = 9; td.className = "empty"; td.textContent = "No reps or calls yet. Add your team below."; tr.appendChild(td); tb.appendChild(tr); return; }
+    rs.sort((a, b) => b.demos - a.demos || b.calls - a.calls).forEach(r => {
+      const tr = document.createElement("tr");
+      const cells = [r.id === "?" ? "Unknown" : nameOf(r.id), r.calls, r.talked, r.demos, r.calls ? Math.round(r.demos / r.calls * 100) + "%" : "—", r.open, r.due, r.overdue, r.won];
+      cells.forEach((v, i) => { const td = document.createElement("td"); td.textContent = v; if (i) td.className = "num"; if (i === 0) td.className = "name"; if (i === 7 && r.overdue) td.style.color = "var(--red)"; tr.appendChild(td); });
+      tb.appendChild(tr);
+    });
+  }
+
+  // ================= appearance =================
+  function setTheme(t){
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+    try { if (t === "auto") localStorage.removeItem("sm-theme"); else localStorage.setItem("sm-theme", t); } catch {}
+    $("thAuto").classList.toggle("on", t === "auto"); $("thLight").classList.toggle("on", t === "light"); $("thDark").classList.toggle("on", t === "dark");
+  }
+  $("thAuto").onclick = () => setTheme("auto"); $("thLight").onclick = () => setTheme("light"); $("thDark").onclick = () => setTheme("dark");
+  setTheme(document.documentElement.dataset.theme || "auto");
+
+  $("callVia").value = callVia;
+  $("callVia").onchange = () => { callVia = $("callVia").value; try { localStorage.setItem("sm-callvia", callVia); } catch {} renderAll(); };
+
+  $("findBtn").onclick = search;
+  [$("kind"), $("city")].forEach(i => i.addEventListener("keydown", e => { if (e.key === "Enter") search(); }));
+  $("showAll").onchange = render;
+  setMode("recep");
+  if (window.__STANDALONE) setView("pipe");
+
+  // test hook (harmless in production)
+  window.__crm = { assignMany, assignees, isMine, canon, nameOf, flush, ldb, get state(){ return { L, C, A, OUT, CONF, online, myId, isAdmin }; }, resolveConflict, logCall, patchLead, createLead, assignLead, planImport, buildCsv, pipeList, repStats, setPeriod: p => { period = p; } };
+})();
+</script>
+<script>
+// ===== Strata Marquee CRM — standalone layer =====
+// Gives the CRM the same small interface it used inside Claude (db, user, downloads),
+// backed by Firebase: Google sign-in, an approval step for reps, and Firestore for shared data.
+(() => {
+  const FIREBASE_CONFIG = {"apiKey": "AIzaSyD6zAJxfNnYiAOiqBOJ0xVKj-5P8FUcPi4", "measurementId": "G-WVE4PXQ84J", "authDomain": "stratamarquee-crm.firebaseapp.com", "projectId": "stratamarquee-crm", "storageBucket": "stratamarquee-crm.firebasestorage.app", "messagingSenderId": "538044086736", "appId": "1:538044086736:web:7885b8e8ecbaacca9f21d5"};
+  const ADMIN_EMAILS = ["stratamarqueegroup@gmail.com", "rhovie.stratamarqueegroup@gmail.com", "admin.stratamarqueegroup@gmail.com"].map(e => e.toLowerCase());
+  // reps you've already approved by email: they go straight in. Value = their name on the Team list ("" = link by hand).
+  const PREAPPROVED = {"rhovie.stratamarqueegroup@gmail.com": "rhovie", "admin.stratamarqueegroup@gmail.com": ""};
+  const preApproved = u => !!u && u.emailVerified !== false && Object.prototype.hasOwnProperty.call(PREAPPROVED, String(u.email || "").toLowerCase());
+  window.__STANDALONE = true;
+  const $ = id => document.getElementById(id);
+  const gate = $("gate");
+
+  function gateState(title, text, opts = {}){
+    $("gateTitle").textContent = title; $("gateText").textContent = text;
+    $("signInBtn").classList.toggle("hidden", !opts.signIn);
+    $("gateSignOut").classList.toggle("hidden", !opts.signOut);
+    $("gateNote").classList.toggle("hidden", !!opts.hideNote);
+    const m = $("gateMsg"); m.innerHTML = "";
+    if (opts.error){ const d = document.createElement("div"); d.className = "msg err"; d.textContent = opts.error; m.appendChild(d); }
+    gate.classList.remove("hidden");
+  }
+
+  if (!window.firebase){ gateState("Can’t load", "The app needs a connection the first time it opens. Connect to the internet and reload.", { hideNote: true }); return; }
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const auth = firebase.auth();
+  const fs = firebase.firestore();
+
+  // ---------- error codes the CRM understands ----------
+  function mapErr(e){
+    const c = (e && e.code) || "";
+    const code = c === "permission-denied" || c === "unauthenticated" ? "invalid_argument"
+      : c === "unavailable" || c === "deadline-exceeded" || c === "failed-precondition" || /offline/i.test(e?.message || "") ? "unavailable"
+      : c === "resource-exhausted" ? "resource_exhausted" : c === "not-found" ? "invalid_argument" : "error";
+    return { code, message: e && e.message };
+  }
+  const wrap = p => Promise.resolve(p).catch(e => { throw mapErr(e); });
+
+  // ---------- db: same shape the CRM already uses ----------
+  let me = null;
+  const db = {
+    collection(name){
+      const col = fs.collection(name);
+      return {
+        onSnapshot(next, onErr){
+          const admin = isAdminUser(me);
+          // Reps may only read their own leads and calls; the rules reject anything wider, so ask for exactly that.
+          let q = col, shape = d => ({ id: d.id, exists: true, data: () => d.data() });
+          if (name === "members") q = col.where("approved", "==", true);
+          else if (!admin && name === "leads") q = col.where("assignedUid", "==", me.uid);
+          else if (!admin && name === "calls") q = col.where("by", "==", me.uid);
+          else if (!admin && name === "assign"){
+            // reps can't read the assignment list; their own leads carry who they're assigned to
+            q = fs.collection("leads").where("assignedUid", "==", me.uid);
+            shape = d => ({ id: d.id, exists: true, data: () => ({ to: d.data().assignedTo || "", by: "", at: d.data().assignedAt || "" }) });
+          }
+          return q.onSnapshot({ includeMetadataChanges: true }, snap => next({
+            docs: snap.docs.map(shape),
+            metadata: { fromCache: snap.metadata.fromCache, hasPendingWrites: snap.metadata.hasPendingWrites }
+          }), e => onErr && onErr(mapErr(e)));
+        },
+        doc(id){
+          const ref = col.doc(id);
+          return {
+            get: () => wrap(ref.get({ source: "server" })).then(s => ({ id, exists: s.exists, data: () => s.data() })),
+            // a member's own record is merged, so the approval flag is never overwritten
+            set: body => wrap(name === "members" ? ref.set(body, { merge: true }) : ref.set(body)),
+            update: patch => wrap(ref.update(patch)),
+            delete: () => wrap(ref.delete()),
+            // short lease so two devices never interleave a read and a write on the same record
+            acquire: ({ holder, ttlMs }) => wrap(fs.runTransaction(async tx => {
+              const lr = fs.collection("leases").doc(name + "__" + id);
+              const s = await tx.get(lr); const now = Date.now(); const l = s.exists ? s.data() : null;
+              if (l && l.until > now && l.holder !== holder) return { acquired: false, expiresAt: new Date(l.until).toISOString() };
+              tx.set(lr, { holder, until: now + (ttlMs || 30000) });
+              return { acquired: true, holder };
+            }))
+          };
+        }
+      };
+    }
+  };
+
+  // ---------- user ----------
+  const people = {};                // uid -> { name, email }
+  const isAdminUser = u => !!u && u.emailVerified !== false && ADMIN_EMAILS.includes(String(u.email || "").toLowerCase());
+  const userApi = {
+    id: async () => me.uid,
+    canEdit: async () => isAdminUser(me),
+    can: async () => true,
+    profiles: async ids => Object.fromEntries(ids.map(i => [i, { name: people[i]?.name || (i === me.uid ? (me.displayName || "You") : "Teammate"), isMe: i === me.uid }]))
+  };
+  const downloads = {
+    save: async ({ filename, data }) => {
+      const blob = data instanceof Blob ? data : new Blob([data], { type: /\.csv$/i.test(filename) ? "text/csv" : "application/octet-stream" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+      return { saved: true };
+    }
+  };
+
+  // ---------- start the CRM once someone is allowed in ----------
+  let started = false;
+  function startCRM(){
+    if (started) return; started = true;
+    window.claude = { use: async n => ({ db, user: userApi, downloads })[n] ?? null };
+    const code = $("crm-code").textContent;
+    const sc = document.createElement("script"); sc.textContent = code; document.body.appendChild(sc);
+    gate.classList.add("hidden");
+    if (isAdminUser(me)) startAdmin();
+    fs.collection("members").where("approved", "==", true).onSnapshot(snap => { snap.docs.forEach(d => { people[d.id] = { name: d.data().name, email: d.data().email }; }); }, () => {});
+  }
+  const approvedKey = uid => "sm-approved-" + uid;
+
+  // ---------- sign-in flow ----------
+  $("signInBtn").onclick = async () => {
+    const p = new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({ prompt: "select_account" });
+    try { await auth.signInWithPopup(p); }
+    catch(e){
+      if (["auth/popup-blocked", "auth/operation-not-supported-in-this-environment", "auth/cancelled-popup-request"].includes(e.code)) { try { await auth.signInWithRedirect(p); return; } catch(e2){ e = e2; } }
+      if (e.code === "auth/popup-closed-by-user") return;
+      gateState("Strata Marquee CRM", "Sign in with your Google account to open your leads.", { signIn: true, error: e.code === "auth/unauthorized-domain" ? "This web address isn’t allowed yet. In Firebase → Authentication → Settings → Authorized domains, add this site’s address." : e.code === "auth/network-request-failed" ? "No connection. Sign-in needs the internet the first time." : "Sign-in didn’t work (" + (e.code || "error") + "). Try again." });
+    }
+  };
+  const signOut = async () => { try { await auth.signOut(); } catch {} location.reload(); };
+  $("gateSignOut").onclick = signOut;
+  $("signOutBtn").onclick = () => { if (confirm("Sign out of Strata Marquee CRM on this device? Changes not yet synced stay saved here for next time.")) signOut(); };
+
+  let ownDocUnsub = null;
+  auth.onAuthStateChanged(async u => {
+    if (ownDocUnsub){ ownDocUnsub(); ownDocUnsub = null; }
+    if (!u){ gateState("Strata Marquee CRM", "Sign in with your Google account to open your leads.", { signIn: true }); return; }
+    me = u;
+    const ref = fs.collection("members").doc(u.uid);
+    const profile = { name: u.displayName || u.email, email: u.email || "" };
+    if (isAdminUser(u)){
+      try { await ref.set({ ...profile, approved: true }, { merge: true }); } catch {}
+      return startCRM();
+    }
+    // a rep: allowed once you approve them. Works offline after the first approval.
+    let cached = false; try { cached = localStorage.getItem(approvedKey(u.uid)) === "1"; } catch {}
+    if (cached && !navigator.onLine) return startCRM();
+    gateState("Checking access…", "One moment.", { hideNote: true });
+    try {
+      const snap = await ref.get({ source: "server" });
+      if (preApproved(u) && (!snap.exists || snap.data().approved !== true)){
+        if (!snap.exists) await ref.set({ ...profile, approved: true, requestedAt: new Date().toISOString(), approvedAt: new Date().toISOString() });
+        else await ref.set({ approved: true, approvedAt: new Date().toISOString() }, { merge: true });
+        try { localStorage.setItem(approvedKey(u.uid), "1"); } catch {}
+        return startCRM();
+      }
+      if (!snap.exists) await ref.set({ ...profile, approved: false, requestedAt: new Date().toISOString() });
+      else if (snap.data().approved === true){ try { localStorage.setItem(approvedKey(u.uid), "1"); } catch {} return startCRM(); }
+    } catch(e){
+      if (cached) return startCRM();
+      gateState("Can’t check access", "You need a connection the first time you sign in.", { signOut: true, error: mapErr(e).code === "unavailable" ? "No connection right now. Try again when you’re online." : "Something went wrong (" + (e.code || "error") + ")." });
+      return;
+    }
+    gateState("Waiting for approval", `Signed in as ${u.email}. Christopher needs to approve you before you can see the pipeline. This page opens by itself as soon as he does.`, { signOut: true, hideNote: true });
+    ownDocUnsub = ref.onSnapshot(s => {
+      if (s.exists && s.data().approved === true){ try { localStorage.setItem(approvedKey(u.uid), "1"); } catch {} ownDocUnsub && ownDocUnsub(); startCRM(); }
+    }, () => {});
+  });
+
+  // ---------- admin: access requests + one-time import ----------
+  function startAdmin(){
+    $("adminBox").classList.remove("hidden");
+    $("tFind").classList.remove("hidden");
+    startAssignmentStamp();
+    // link pre-approved reps to their name on the Team list the first time they sign in
+    let roster = {}, approved = {};
+    const autoLink = async () => {
+      for (const [uid, m] of Object.entries(approved)){
+        const rid = PREAPPROVED[String(m.email || "").toLowerCase()];
+        if (!rid || !roster[rid]) continue;
+        if (roster[rid].linkedUser === uid) continue;
+        if (roster[rid].linkedUser && roster[rid].linkedUser !== uid) continue;          // never steal a link you set by hand
+        if (Object.values(roster).some(r => r.linkedUser === uid)) continue;             // already linked elsewhere
+        try { await fs.collection("roster").doc(rid).set({ ...roster[rid], linkedUser: uid }); } catch {}
+      }
+    };
+    fs.collection("roster").onSnapshot(sn => { roster = {}; sn.docs.forEach(d => roster[d.id] = d.data()); autoLink(); }, () => {});
+    fs.collection("members").where("approved", "==", true).onSnapshot(sn => { approved = {}; sn.docs.forEach(d => approved[d.id] = d.data()); autoLink(); }, () => {});
+    fs.collection("members").where("approved", "==", false).onSnapshot(snap => {
+      const tb = $("accessRows"); tb.innerHTML = "";
+      if (!snap.docs.length){ const tr = document.createElement("tr"); const td = document.createElement("td"); td.colSpan = 4; td.className = "empty"; td.textContent = "No one waiting."; tr.appendChild(td); tb.appendChild(tr); return; }
+      snap.docs.forEach(d => {
+        const m = d.data(), tr = document.createElement("tr");
+        [m.name || "—", m.email || "—", m.requestedAt ? new Date(m.requestedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""].forEach((v, i) => { const td = document.createElement("td"); td.textContent = v; if (!i) td.className = "name"; tr.appendChild(td); });
+        const td = document.createElement("td"); const row = document.createElement("div"); row.className = "rowbtns";
+        const ok = document.createElement("button"); ok.className = "primary small"; ok.textContent = "Approve";
+        ok.onclick = async () => { ok.disabled = true; try { await fs.collection("members").doc(d.id).update({ approved: true, approvedAt: new Date().toISOString() }); } catch(e){ alert("Couldn’t approve: " + (e.code || e.message)); ok.disabled = false; } };
+        const no = document.createElement("button"); no.className = "linkbtn danger"; no.textContent = "Deny";
+        no.onclick = async () => { if (!confirm(`Deny ${m.email}? They can ask again by signing in.`)) return; try { await fs.collection("members").doc(d.id).delete(); } catch {} };
+        row.append(ok, no); td.appendChild(row); tr.appendChild(td); tb.appendChild(tr);
+      });
+    }, () => {});
+    $("restoreBtn").onclick = () => { $("restoreFile").value = ""; $("restoreFile").click(); };
+    $("restoreFile").onchange = async () => {
+      const f = $("restoreFile").files[0]; if (!f) return;
+      let data; try { data = JSON.parse(await f.text()); } catch { return note("That file isn’t a backup from the Claude version.", true); }
+      if (!data || data.format !== "strata-crm-backup-v1") return note("That file isn’t a backup from the Claude version.", true);
+      if (!confirm(`Import ${Object.keys(data.leads).length} leads, ${Object.keys(data.calls).length} calls, ${Object.keys(data.assign).length} assignments and ${Object.keys(data.roster).length} team members? Records already here are kept as they are.`)) return;
+      try { const r = await importBackup(data); note(`Imported ${r.added} records${r.skipped ? ` · ${r.skipped} already here, left as they were` : ""}. Everything syncs to your reps automatically.`); }
+      catch(e){ note("Import stopped (" + (mapErr(e).code) + "). Check your connection and run it again; nothing will be doubled.", true); }
+    };
+    function note(t, err){ const m = $("restoreMsg"); m.innerHTML = ""; const d = document.createElement("div"); d.className = "msg" + (err ? " err" : ""); d.textContent = t; m.appendChild(d); }
+  }
+  // ---------- admin: keep each lead stamped with who it belongs to ----------
+  // The assignment list (admin-only) is the source of truth. Each lead carries a copy
+  // (assignedTo = "r:<rep>" or an account, assignedUid = the rep's Google account) so the
+  // security rules can show a rep only their own leads. Re-stamped whenever an assignment
+  // or a rep's linked account changes.
+  function startAssignmentStamp(){
+    let LD = null, AS = null, RO = null, timer = null, running = false, again = false;
+    const resolve = to => !to ? "" : String(to).startsWith("r:") ? ((RO[to.slice(2)] || {}).linkedUser || "") : to;
+    const soon = () => { clearTimeout(timer); timer = setTimeout(run, 600); };
+    async function run(){
+      if (!LD || !AS || !RO) return;
+      if (running){ again = true; return; } running = true;
+      try {
+        const fixes = [];
+        for (const [id, l] of Object.entries(LD)){
+          const a = AS[id] || {}; const to = a.to || ""; const uid = resolve(to);
+          if ((l.assignedTo || "") !== to || (l.assignedUid || "") !== uid) fixes.push([id, { assignedTo: to, assignedUid: uid, assignedAt: a.at || "" }]);
+        }
+        for (let i = 0; i < fixes.length; i += 400){
+          const chunk = fixes.slice(i, i + 400), b = fs.batch();
+          chunk.forEach(([id, f]) => b.update(fs.collection("leads").doc(id), f));
+          try { await b.commit(); }
+          catch { for (const [id, f] of chunk) { try { await fs.collection("leads").doc(id).update(f); } catch {} } }   // a lead removed meanwhile
+        }
+      } finally { running = false; if (again){ again = false; soon(); } }
+    }
+    fs.collection("leads").onSnapshot(sn => { LD = {}; sn.docs.forEach(d => LD[d.id] = d.data()); soon(); }, () => {});
+    fs.collection("assign").onSnapshot(sn => { AS = {}; sn.docs.forEach(d => AS[d.id] = d.data()); soon(); }, () => {});
+    fs.collection("roster").onSnapshot(sn => { RO = {}; sn.docs.forEach(d => RO[d.id] = d.data()); soon(); }, () => {});
+  }
+
+  // the old Claude account id becomes your Firebase id everywhere it appears
+  async function importBackup(data){
+    const swap = v => (data.ownerIds || []).includes(v) ? me.uid : v;
+    const fixRoster = o => ({ ...o, linkedUser: swap(o.linkedUser || "") });
+    const fixLead = o => ({ ...o, addedBy: swap(o.addedBy), updatedBy: swap(o.updatedBy), ...(o.lastCallBy ? { lastCallBy: swap(o.lastCallBy) } : {}) });
+    const fixCall = o => ({ ...o, by: swap(o.by) });
+    const fixAssign = o => ({ ...o, by: swap(o.by), to: swap(o.to || "") });
+    let added = 0, skipped = 0;
+    for (const [coll, items, fix] of [["roster", data.roster, fixRoster], ["leads", data.leads, fixLead], ["calls", data.calls, fixCall], ["assign", data.assign, fixAssign]]){
+      const ids = Object.keys(items);
+      for (let i = 0; i < ids.length; i += 400){
+        const chunk = ids.slice(i, i + 400);
+        const existing = await Promise.all(chunk.map(id => fs.collection(coll).doc(id).get({ source: "server" }).then(s => s.exists)));
+        const batch = fs.batch(); let n = 0;
+        chunk.forEach((id, k) => { if (existing[k]) { skipped++; return; } batch.set(fs.collection(coll).doc(id), fix(items[id])); n++; });
+        if (n) await batch.commit();
+        added += n;
+      }
+    }
+    return { added, skipped };
+  }
+
+  // ---------- installable, opens offline ----------
+  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  window.__sa = { importBackup, db, auth: () => me, config: FIREBASE_CONFIG };
+})();
+
+</script>
+</body>
+</html>
