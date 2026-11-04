@@ -13,6 +13,7 @@ rules_version = '2';
 //   assign/{leadId}    the admin's assignment list (to = "r:<rep>" or an account)
 //   roster/{repId}     team list: name + linkedUser (the rep's Google account)
 //   members/{uid}      everyone who signed in: name, email, approved
+//   trash/{leadId}     "Recently removed": a copy of each removed lead, so it can be restored
 //   leases/{id}        short write locks used while syncing
 
 service cloud.firestore {
@@ -43,7 +44,7 @@ service cloud.firestore {
              'lastDisposition', 'lastCallAt', 'lastCallBy',
              'text', 'email', 'rev', 'updatedAt', 'updatedBy'])
         && request.resource.data.get('updatedBy', '') == request.auth.uid
-        && request.resource.data.get('stage', 'new') in ['new', 'contacted', 'replied', 'demo', 'won', 'lost', 'dnc']
+        && request.resource.data.get('stage', 'new') in ['none', 'new', 'contacted', 'replied', 'demo', 'won', 'lost', 'dnc']
       );
     }
 
@@ -58,12 +59,14 @@ service cloud.firestore {
       allow update: if isAdmin() || (isRep()
         && resource.data.by == request.auth.uid
         && request.resource.data.by == request.auth.uid);
-      allow delete: if isAdmin();
+      // "Undo" on a call: reps can take back only calls they logged themselves
+      allow delete: if isAdmin() || (isRep() && resource.data.by == request.auth.uid);
     }
 
     // ---------------- assignments and team: admin only ----------------
     match /assign/{leadId} { allow read, write: if isAdmin(); }
     match /roster/{repId}  { allow read: if canWork(); allow write: if isAdmin(); }
+    match /trash/{leadId}  { allow read, write: if isAdmin(); }
 
     // ---------------- sync locks ----------------
     match /leases/{id} { allow read, write: if canWork(); }
