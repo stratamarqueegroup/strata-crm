@@ -333,7 +333,8 @@ th.num{text-align:right}
       <select id="pCamp" style="width:auto;min-width:170px"><option value="">All campaigns</option></select>
       <div class="seg" id="ownerSeg"><button id="oAll" class="on">Everyone</button><button id="oMine">Mine</button><button id="oNone">Unassigned</button></div>
       <label class="check" for="callVia" style="gap:6px">Calls open in
-        <select id="callVia" style="width:auto;min-width:150px;height:34px;padding:6px 28px 6px 10px;font-size:13.5px;background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px"><option value="tel">One-click (Google Voice on computer, phone app on mobile)</option><option value="gv">Open the Google Voice website</option></select>
+        <select id="callVia" style="width:auto;min-width:150px;height:34px;padding:6px 28px 6px 10px;font-size:13.5px;background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px"><option value="gv">Google Voice website</option><option value="tel">One-click (Google Voice on computer, phone app on mobile)</option></select>
+        <select id="gvAcct" title="Which signed-in Google account has your Google Voice number" style="width:auto;min-width:118px;height:34px;padding:6px 28px 6px 10px;font-size:13.5px;background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px"><option value="0">Voice: /u/0</option><option value="1">Voice: /u/1</option><option value="2">Voice: /u/2</option><option value="3">Voice: /u/3</option></select>
         <button class="linkbtn" id="gvHelp" type="button">How to set up</button>
       </label>
       <span class="grow"></span>
@@ -1223,8 +1224,10 @@ th.num{text-align:right}
     frag.append(nm, ct); return frag;
   }
   // where a tapped number goes: the device's phone app (tel:) or the rep's Google Voice account in a new tab
-  let callVia = (() => { try { return localStorage.getItem("sm-callvia") || "tel"; } catch { return "tel"; } })();
-  function gvUrl(num){ return "https://voice.google.com/u/0/calls?a=nc," + encodeURIComponent(num); }
+  // default: open Google Voice on the second signed-in Google account (voice.google.com/u/1/calls) with the number ready
+  let callVia = (() => { try { return localStorage.getItem("sm-callvia2") || "gv"; } catch { return "gv"; } })();
+  let gvAcct = (() => { try { const v = localStorage.getItem("sm-gvacct"); return v === null ? "1" : v; } catch { return "1"; } })();
+  function gvUrl(num){ return "https://voice.google.com/u/" + gvAcct + "/calls?a=nc," + encodeURIComponent(num); }
   let callingId = null;   // lead being called right now: its card opens, ready for the outcome
   function phoneLink(phone, e, leadIdForCall){
     if (!phone){ return document.createTextNode("—"); }
@@ -1788,7 +1791,9 @@ Reply with JSON only: {"text": "...", "email": "..."}`;
 
   $("gvHelp").onclick = () => pStatus("One-click calling with Google Voice (computers): open voice.google.com in Chrome or Edge, signed in to the Google Voice account you call from. When asked, allow it to open phone links (or click “Register now” in the blue banner). Then choose “One-click” here: tapping a number dials it in Google Voice. On a phone: tapping a number opens the phone app; on Android you can set the Voice app to place calls. Calls are logged under whoever is signed in to this CRM, even if you share one Google Voice number.");
   $("callVia").value = callVia;
-  $("callVia").onchange = () => { callVia = $("callVia").value; try { localStorage.setItem("sm-callvia", callVia); } catch {} renderAll(); };
+  $("callVia").onchange = () => { callVia = $("callVia").value; try { localStorage.setItem("sm-callvia2", callVia); } catch {} $("gvAcct").classList.toggle("hidden", callVia !== "gv"); renderAll(); };
+  $("gvAcct").value = gvAcct; $("gvAcct").classList.toggle("hidden", callVia !== "gv");
+  $("gvAcct").onchange = () => { gvAcct = $("gvAcct").value; try { localStorage.setItem("sm-gvacct", gvAcct); } catch {} renderAll(); };
 
   $("findBtn").onclick = search;
   [$("kind"), $("city")].forEach(i => i.addEventListener("keydown", e => { if (e.key === "Enter") search(); }));
